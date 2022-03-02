@@ -169,6 +169,73 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://hcy6713.cn/posts/c3ee3f83/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/me.png">
+      <meta itemprop="name" content="hcy6713">
+      <meta itemprop="description" content="选择有时候比努力更重要">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="hcy6713">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/posts/c3ee3f83/" class="post-title-link" itemprop="url">多版本控制MVCC</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2022-03-02 21:19:39 / 修改时间：21:21:49" itemprop="dateCreated datePublished" datetime="2022-03-02T21:19:39+08:00">2022-03-02</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%95%B0%E6%8D%AE%E5%BA%93/" itemprop="url" rel="index"><span itemprop="name">数据库</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://hcy6713.cn/posts/92d20082/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -200,7 +267,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-02 20:08:27" itemprop="dateModified" datetime="2022-03-02T20:08:27+08:00">2022-03-02</time>
+                <time title="修改时间：2022-03-02 21:22:10" itemprop="dateModified" datetime="2022-03-02T21:22:10+08:00">2022-03-02</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -269,7 +336,7 @@
 <h4 id="表定义的更新"><a href="#表定义的更新" class="headerlink" title="表定义的更新"></a><strong>表定义的更新</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> Product <span class="keyword">ADD</span> <span class="keyword">COLUMN</span> product_name_pinyin <span class="type">VARCHAR</span>(<span class="number">100</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">ALTER</span> <span class="keyword">TABLE</span> Product <span class="keyword">DROP</span> <span class="keyword">COLUMN</span> product_name_pinyin;</span><br></pre></td></tr></table></figure>
 <h4 id="向表中插入数据"><a href="#向表中插入数据" class="headerlink" title="向表中插入数据"></a><strong>向表中插入数据</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">START</span> TRANSACTION;</span><br><span class="line"></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0001&#x27;</span>, <span class="string">&#x27;T恤&#x27;</span> ,<span class="string">&#x27;衣服&#x27;</span>, <span class="number">1000</span>, <span class="number">500</span>, <span class="string">&#x27;2009-09-20&#x27;</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0002&#x27;</span>, <span class="string">&#x27;打孔器&#x27;</span>, <span class="string">&#x27;办公用品&#x27;</span>, <span class="number">500</span>, <span class="number">320</span>, <span class="string">&#x27;2009-09-11&#x27;</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0003&#x27;</span>, <span class="string">&#x27;运动T恤&#x27;</span>, <span class="string">&#x27;衣服&#x27;</span>, <span class="number">4000</span>, <span class="number">2800</span>, <span class="keyword">NULL</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0004&#x27;</span>, <span class="string">&#x27;菜刀&#x27;</span>, <span class="string">&#x27;厨房用具&#x27;</span>, <span class="number">3000</span>, <span class="number">2800</span>, <span class="string">&#x27;2009-09-20&#x27;</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0005&#x27;</span>, <span class="string">&#x27;高压锅&#x27;</span>, <span class="string">&#x27;厨房用具&#x27;</span>, <span class="number">6800</span>, <span class="number">5000</span>, <span class="string">&#x27;2009-01-15&#x27;</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0006&#x27;</span>, <span class="string">&#x27;叉子&#x27;</span>, <span class="string">&#x27;厨房用具&#x27;</span>, <span class="number">500</span>, <span class="keyword">NULL</span>, <span class="string">&#x27;2009-09-20&#x27;</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0007&#x27;</span>, <span class="string">&#x27;擦菜板&#x27;</span>, <span class="string">&#x27;厨房用具&#x27;</span>, <span class="number">880</span>, <span class="number">790</span>, <span class="string">&#x27;2008-04-28&#x27;</span>);</span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> Product <span class="keyword">VALUES</span> (<span class="string">&#x27;0008&#x27;</span>, <span class="string">&#x27;圆珠笔&#x27;</span>, <span class="string">&#x27;办公用品&#x27;</span>, <span class="number">100</span>, <span class="keyword">NULL</span>, <span class="string">&#x27;2009-11-11&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="keyword">COMMIT</span>;</span><br></pre></td></tr></table></figure>
 <h2 id="Chapter-02-查询基础"><a href="#Chapter-02-查询基础" class="headerlink" title="Chapter 02 查询基础"></a>Chapter 02 查询基础</h2><h3 id="2-1-SELECT语句基础"><a href="#2-1-SELECT语句基础" class="headerlink" title="2.1 SELECT语句基础"></a>2.1 SELECT语句基础</h3><h4 id="列的查询"><a href="#列的查询" class="headerlink" title="列的查询"></a><strong>列的查询</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> product_id, product_name, purchase_price</span><br><span class="line">  <span class="keyword">FROM</span> Product;</span><br><span class="line"></span><br><span class="line"><span class="keyword">SELECT</span> <span class="operator">*</span></span><br><span class="line">  <span class="keyword">FROM</span> Product;</span><br></pre></td></tr></table></figure>
-<h4 id="为列设定别名"><a href="#为列设定别名" class="headerlink" title="为列设定别名"></a><strong>为列设定别名</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> product_id		<span class="keyword">AS</span> id, </span><br><span class="line">       product_name		<span class="keyword">AS</span> &quot;商品名称&quot;,</span><br><span class="line">       purchase_price	<span class="keyword">AS</span> price</span><br><span class="line">  <span class="keyword">FROM</span> Product;</span><br></pre></td></tr></table></figure>
+<h4 id="为列设定别名"><a href="#为列设定别名" class="headerlink" title="为列设定别名"></a><strong>为列设定别名</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> product_id  <span class="keyword">AS</span> id, </span><br><span class="line">       product_name  <span class="keyword">AS</span> &quot;商品名称&quot;,</span><br><span class="line">       purchase_price <span class="keyword">AS</span> price</span><br><span class="line">  <span class="keyword">FROM</span> Product;</span><br></pre></td></tr></table></figure>
 <h4 id="常数的查询"><a href="#常数的查询" class="headerlink" title="常数的查询"></a><strong>常数的查询</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">SELECT</span> <span class="string">&#x27;商品&#x27;</span> <span class="keyword">AS</span> string, <span class="number">38</span> <span class="keyword">AS</span> number, <span class="string">&#x27;2009-02-24&#x27;</span> <span class="keyword">AS</span> <span class="type">date</span>,</span><br><span class="line">       product_id, product_name</span><br></pre></td></tr></table></figure>
 <h4 id="从结果中删去重复行"><a href="#从结果中删去重复行" class="headerlink" title="从结果中删去重复行"></a><strong>从结果中删去重复行</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- NULL也被视为一类数据</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">DISTINCT</span> product_type</span><br><span class="line">  <span class="keyword">FROM</span> Product;</span><br><span class="line"><span class="comment">-- 多列前使用DISTINCT关键字，对product_type列和regist_date列的数据进行组合</span></span><br><span class="line"><span class="keyword">SELECT</span> <span class="keyword">DISTINCT</span> product_type, regist_date</span><br><span class="line">  <span class="keyword">FROM</span> Product;</span><br><span class="line"><span class="comment">-- DISTINCT关键字只能用在第一个列名之前</span></span><br></pre></td></tr></table></figure>
 <h4 id="根据WHERE语句·来选择记录"><a href="#根据WHERE语句·来选择记录" class="headerlink" title="根据WHERE语句·来选择记录"></a><strong>根据WHERE语句·来选择记录</strong></h4><figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">-- 通过WHERE子句来指定查询数据的条件</span></span><br><span class="line"><span class="keyword">SELECT</span> product_name, product_type</span><br><span class="line">  <span class="keyword">FROM</span> Product</span><br><span class="line"> <span class="keyword">WHERE</span> product_type <span class="operator">=</span> <span class="string">&#x27;衣服&#x27;</span>;</span><br><span class="line"><span class="comment">-- 首先通过WHERE子句查询出符合指定条件的记录，然后再选出SELECT语句指定的列</span></span><br></pre></td></tr></table></figure>
@@ -1056,7 +1123,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-count">3</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
@@ -1069,7 +1136,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-count">5</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
