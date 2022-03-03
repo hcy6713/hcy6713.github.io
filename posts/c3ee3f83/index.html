@@ -22,20 +22,26 @@
     var CONFIG = {"hostname":"hcy6713.cn","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":true,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
   </script>
 
-  <meta name="description" content="选择有时候比努力更重要">
+  <meta name="description" content="一、概念MVVC (Multi-Version Concurrency Control) (注：与 MVCC 相对的，是基于锁的并发控制，Lock-Based Concurrency Control)是一种基于多版本的并发控制协议，只有在InnoDB引擎下存在。  MVCC 是为了实现事务的隔离，通过版本号，避免同一数据在不同事务间的竞争，可以把它当成基于多版本号的一种乐观锁。  MVCC 只在提">
 <meta property="og:type" content="article">
-<meta property="og:title" content="多版本控制MVCC">
+<meta property="og:title" content="MYSQL之MVCC原理">
 <meta property="og:url" content="http://hcy6713.cn/posts/c3ee3f83/index.html">
 <meta property="og:site_name" content="hcy6713">
-<meta property="og:description" content="选择有时候比努力更重要">
+<meta property="og:description" content="一、概念MVVC (Multi-Version Concurrency Control) (注：与 MVCC 相对的，是基于锁的并发控制，Lock-Based Concurrency Control)是一种基于多版本的并发控制协议，只有在InnoDB引擎下存在。  MVCC 是为了实现事务的隔离，通过版本号，避免同一数据在不同事务间的竞争，可以把它当成基于多版本号的一种乐观锁。  MVCC 只在提">
 <meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://hcy6713.cn/posts/c3ee3f83/隐藏字段.jpg">
+<meta property="og:image" content="http://hcy6713.cn/posts/c3ee3f83/undo%20log.jpg">
+<meta property="og:image" content="http://hcy6713.cn/posts/c3ee3f83/RR快照读.jpg">
+<meta property="og:image" content="http://hcy6713.cn/posts/c3ee3f83/RR当前读.jpg">
+<meta property="og:image" content="http://hcy6713.cn/posts/c3ee3f83/特殊情景.jpg">
 <meta property="article:published_time" content="2022-03-02T13:19:39.000Z">
-<meta property="article:modified_time" content="2022-03-02T13:21:49.091Z">
+<meta property="article:modified_time" content="2022-03-03T12:15:02.365Z">
 <meta property="article:author" content="hcy6713">
-<meta property="article:tag" content="数据库">
-<meta property="article:tag" content="并发一致性">
-<meta property="article:tag" content="锁">
+<meta property="article:tag" content="MVCC">
+<meta property="article:tag" content="undo log">
+<meta property="article:tag" content="read view">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://hcy6713.cn/posts/c3ee3f83/隐藏字段.jpg">
 
 <link rel="canonical" href="http://hcy6713.cn/posts/c3ee3f83/">
 
@@ -50,7 +56,7 @@
   };
 </script>
 
-  <title>多版本控制MVCC | hcy6713</title>
+  <title>MYSQL之MVCC原理 | hcy6713</title>
   
 
 
@@ -188,7 +194,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          多版本控制MVCC
+          MYSQL之MVCC原理
         </h1>
 
         <div class="post-meta">
@@ -197,10 +203,16 @@
                 <i class="far fa-calendar"></i>
               </span>
               <span class="post-meta-item-text">发表于</span>
-              
 
-              <time title="创建时间：2022-03-02 21:19:39 / 修改时间：21:21:49" itemprop="dateCreated datePublished" datetime="2022-03-02T21:19:39+08:00">2022-03-02</time>
+              <time title="创建时间：2022-03-02 21:19:39" itemprop="dateCreated datePublished" datetime="2022-03-02T21:19:39+08:00">2022-03-02</time>
             </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-03-03 20:15:02" itemprop="dateModified" datetime="2022-03-03T20:15:02+08:00">2022-03-03</time>
+              </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
                 <i class="far fa-folder"></i>
@@ -229,7 +241,415 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        
+        <h2 id="一、概念"><a href="#一、概念" class="headerlink" title="一、概念"></a>一、概念</h2><p>MVVC (Multi-Version Concurrency Control) (注：与 MVCC 相对的，是<font color="#8888ff">基于锁的并发控制</font>，Lock-Based Concurrency Control)是一种<font color="#ff7700">基于多版本的并发控制协议</font>，只有在<font color="#ff7700">InnoDB</font>引擎下存在。</p>
+<ul>
+<li><p>MVCC 是为了<font color="#ff7700">实现事务的隔离</font>，通过<font color="#ff7700">版本号</font>，避免同一数据在不同事务间的竞争，可以把它当成基于多版本号的一种<font color="#ff7700">乐观锁</font>。</p>
+</li>
+<li><p>MVCC 只在<font color="#ff7700">提交读(READ COMMITTED)</font>和<font color="#ff7700">可重复读(REPEATABLE READ)</font>事务级别下工作；其他两个隔离级别和 MVCC 不兼容，因为未提交读(READ UNCOMMITTED)总是读取最新的数据行，而不是符合当前事务版本的数据行。而可串行化(SERIALIZABLE)则会对所有读取的<font color="#8888ff">表</font>都加锁。</p>
+</li>
+<li><p>MVCC 最大的好处：读不加锁，读写不冲突。在读多写少的<a target="_blank" rel="noopener" href="https://www.cnblogs.com/hhandbibi/p/7118740.html">OLTP</a>应用中，读写不冲突极大的<font color="#ff7700">增加了系统的并发性能</font>。</p>
+</li>
+<li><p>Oracle，PostgreSQL 等其他数据库系统也都实现了 MVCC，但各自的实现机制不尽相同，因为 MVCC 没有一个统一的实现标准。</p>
+</li>
+<li><p>可以认为 MVCC 是<font color="#ff7700">行级锁</font>的一个变种，但是它在很多情况下避免了加锁操作，因此开销更低。虽然实现机制有所不同，但大都<font color="#ff7700">实现了非阻塞的读操作，写操作也只锁定必要的行</font>。</p>
+</li>
+<li><p>MVCC 的实现方式有多种，典型的有<font color="#ff7700">乐观(optimistic)并发控制</font>和<font color="#ff7700">悲观(pessimistic)并发控制</font>。</p>
+</li>
+</ul>
+<h2 id="二、快照读和当前读"><a href="#二、快照读和当前读" class="headerlink" title="二、快照读和当前读"></a>二、快照读和当前读</h2><h3 id="2-1-快照读"><a href="#2-1-快照读" class="headerlink" title="2.1 快照读"></a>2.1 快照读</h3><p>快照读又叫<font color="#ff7700">一致性读</font>，读取的是<font color="#ff7700">快照数据</font>。<font color="#ff7700">不加锁的简单的SELECT都属于快照读</font>，即不加锁的非阻塞读</p>
+<p><code>SELECT * FROM table WHERE ...</code></p>
+<p>之所以出现快照读的情况，是基于提高并发性能的考虑，快照读的实现是基于MVCC，它在很多情况下，避免了加锁操作，降低了开销</p>
+<p>既然是基于多版本，那么快照读可能读到的并不一定是数据的最新版本，而有可能是之前的历史版本。</p>
+<p>快照读的前提是隔离级别不是串行级别，串行级别下的快照读会退化成当前读。</p>
+<h3 id="2-2-当前读"><a href="#2-2-当前读" class="headerlink" title="2.2 当前读"></a>2.2 当前读</h3><p>当前读读取的是记录的<font color="#ff7700">最新版本</font>(最新数据，而不是历史版本的数据)，读取时还要保证其他并发事务不能修改当前记录，会对读取的记录进行加锁。加锁的 SELECT，或者对数据进行增删改都会进行当前读。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">SELECT * FROM student LOCK IN SHARE MODE; # 读锁(S锁，共享锁)</span><br><span class="line">SELECT * FROM student FOR UPDATE; # 写锁(X锁，排他锁)</span><br><span class="line">INSERT INTO student values ... # 排他锁</span><br><span class="line">DELETE FROM student WHERE ... # 排他锁</span><br><span class="line">UPDATE student SET ... # 排他锁</span><br></pre></td></tr></table></figure>
+<h2 id="三、实现机制"><a href="#三、实现机制" class="headerlink" title="三、实现机制"></a>三、实现机制</h2><h3 id="2-1-隐藏字段"><a href="#2-1-隐藏字段" class="headerlink" title="2.1 隐藏字段"></a>2.1 隐藏字段</h3><p>InnoDB 在每行数据都增加<font color="#ff7700">四个隐藏字段</font></p>
+<ol>
+
+<li>
+
+<font color="#ff7700">DATA_ROW_ID</font>，6 个字节，隐含的<font color="#ff7700">自增 ID</font>，如果数据表没有主键，InnoDB 会自动以 DB_ROW_ID 产生一个聚簇索引。这是一个用来<font color="#ff7700">唯一标识每一行</font>的字段；
+
+</li>
+
+<li>
+
+<font color="#ff7700">DATA_TRX_ID</font>，6 个字节，标记了<font color="#ff7700">最近 update(delete 也认为是 update)或 insert 这条 record 的 transaction id</font>；DATA_TRX_ID 只有在<font color="#ff7700">事务提交之后</font>才会更新；
+
+</li>
+
+<li>
+
+<font color="#ff7700">DATA_ROLL_PTR</font>，7 个字节，一个<font color="#ff7700">rollback 指针，指向当前这一行数据的上一个版本</font>，找之前版本的数据就是通过这个指针，通过这个指针将数据的多个版本连接在一起构成一个 undo log 版本链
+
+</li>
+
+<li>
+
+<font color="#ff7700">DELETE_BIT</font>，用于标识当前记录是否被删除，这里的不是真正的删除数据，而是标志出来的删除。真正意义的删除是在 commit 的时候。
+
+</li>
+
+</ol>
+
+<div align="center">
+
+<img src="/posts/c3ee3f83/隐藏字段.jpg" style="zoom:40%">
+
+</div>
+
+<h3 id="2-2-Undo-log"><a href="#2-2-Undo-log" class="headerlink" title="2.2 Undo log"></a>2.2 Undo log</h3><h4 id="1、概念"><a href="#1、概念" class="headerlink" title="1、概念"></a>1、概念</h4><p>Undo log:撤回日志记录,也称<font color="#ff7700">版本链</font>。当前事务<font color="#ff7700">未提交之前</font>，undo log 保存了当前事务的正在操作的数据记录的所有版本的信息，undo log 中的数据可作为数据旧版本快照供其他并发事务进行<font color="#ff7700">快照读</font>。每次有其它事务提交对当前数据行的修改，都是添加到 undo log 中。undo log 是由每个数据行的多个不同的版本链接在一起构成的一个记录“链表”。</p>
+<ul>
+<li><p>InnoDB 对 undo log 的管理采用段的方式。<strong>rollback segment 称为回滚段，每个回滚段中有 1024 个 undo log segment</strong></p>
+</li>
+<li><p>MySQL5.5 以前，只支持 1 个 rollback segment(回滚段)，只能记录 1024 个 undo log segment<br>MySQL5.5 支持 128 个 rollback segment，即支持 128 * 1024 个 undo log segment<br>MySQL8.0 每个 Undo tablespace(默认为 2，可以动态增加，最多 127 个)可以创建 128 个 rollback segment</p>
+</li>
+<li><p>undo log 默认存放在共享表空间中。</p>
+</li>
+</ul>
+<h4 id="2、Undo-log-的用途"><a href="#2、Undo-log-的用途" class="headerlink" title="2、Undo log 的用途"></a>2、Undo log 的用途</h4><ol>
+
+<li>保证<font color="#ff7700">事务</font>进行<font color="#ff7700">rollback</font>时的<font color="#ff7700">原子性和一致性</font>，当事务进行<font color="#ff7700">回滚</font>的时候可以用undo log的数据进行<font color="#ff7700">恢复</font></li>
+
+<li>用于MVCC<font color="#ff7700">快照读</font>的数据，在MVCC中，通过读取<font color="#ff7700">undo log</font>的<font color="#ff7700">历史版本数据</font>可以实现<font color="#ff7700">不同事务版本号</font>都拥有自己<font color="#ff7700">独立的快照数据版本</font></li>
+
+</ol>
+
+<h4 id="3、Undo-log-的分类"><a href="#3、Undo-log-的分类" class="headerlink" title="3、Undo log 的分类"></a>3、Undo log 的分类</h4><ul>
+<li><p>insert undo log<br>代表事务在insert新记录时产生的undo log , 只在事务回滚时需要，并且在事务提交后可以被立即丢弃</p>
+</li>
+<li><p>update undo log（主要）<br>事务在进行update或delete时产生的undo log ; 不仅在事务回滚时需要，在快照读时也需要；所以不能随便删除，只有在快速读或事务回滚不涉及该日志时，对应的日志才会被<font color="#ff7700">purge线程</font>统一清除</p>
+<ul>
+<li>更新主键<br>TODO</li>
+<li>更新非主键<br>TODO</li>
+<li>删除操作<br>TODO</li>
+</ul>
+</li>
+</ul>
+<h4 id="4、简单示例"><a href="#4、简单示例" class="headerlink" title="4、简单示例"></a>4、简单示例</h4><center>
+
+表 1 事务操作流程
+
+</center>
+
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:left">时间顺序</th>
+<th style="text-align:left">事务 1113</th>
+<th style="text-align:left">事务 1115</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">1</td>
+<td style="text-align:left">BEGIN;</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">2</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">BEGIN;</td>
+</tr>
+<tr>
+<td style="text-align:left">3</td>
+<td style="text-align:left">UPDATE table SET birth=’01-02’ WHERE id=1;</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">4</td>
+<td style="text-align:left">COMMIT;</td>
+<td style="text-align:left"></td>
+</tr>
+<tr>
+<td style="text-align:left">5</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">UPDATE table SET name=’小红’ WHERE id=1;</td>
+</tr>
+<tr>
+<td style="text-align:left">6</td>
+<td style="text-align:left"></td>
+<td style="text-align:left">COMMIT;</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div align="center">
+
+<img src="/posts/c3ee3f83/undo log.jpg" style="zoom:40%">
+
+</div>
+
+<center>
+
+图 1 相应的 undo log 示例
+
+</center>
+
+<h3 id="2-3-Read-View"><a href="#2-3-Read-View" class="headerlink" title="2.3 Read View"></a>2.3 Read View</h3><h4 id="1、Read-View概念"><a href="#1、Read-View概念" class="headerlink" title="1、Read View概念"></a>1、Read View概念</h4><p>事务进行<font color="#ff7700">快照读</font>操作的时候生产的<font color="#ff7700">读视图</font>(Read View)，在该事务执行的快照读的那一刻，会生成数据库系统当前的一个<font color="#ff7700">快照</font>。</p>
+<p>记录并维护系统<font color="#ff7700">当前活跃事务</font>的 ID(没有commit，当每个事务开启时，都会被分配一个 ID, 这个 ID 是递增的，所以越新的事务，ID 值越大)，是系统中当前不应该被<font color="#ff7700">本事务</font>看到的<font color="#ff7700">其他事务 id 列表</font>。</p>
+<p>Read View 主要是用来做<font color="#ff7700">可见性判断</font>的, 即当<font color="#ff7700">某个事务</font>执行<font color="#ff7700">快照读</font>的时候，对该记录创建一个 Read View 读视图，作为条件用来判断<font color="#ff7700">当前事务</font>能够看到<font color="#ff7700">哪个版本</font>的数据，既可能是当前<font color="#ff7700">最新</font>的数据，也有可能是该行记录的 undo log 里面的<font color="#ff7700">某个版本</font>的数据。</p>
+<h4 id="2、属性"><a href="#2、属性" class="headerlink" title="2、属性"></a>2、属性</h4><ul>
+<li><p><font color="#ff7700">trx_ids</font>: 当前系统活跃(<font color="#ff7700">未提交</font>)事务ID列表</p>
+</li>
+<li><p><font color="#ff7700">m_trx_ids</font>：当前系统活跃事务ID列表长度</p>
+</li>
+<li><font color="#ff7700">low_limit_ID</font>: 创建当前read view时当前系统<font color="#ff7700">最大事务id + 1</font>
+</li>
+<li><p><font color="#ff7700">up_limit_id</font>: 创建当前read view时系统<font color="#ff7700">活跃</font>事务的<font color="#ff7700">最小ID</font>”</p>
+</li>
+<li><p><font color="#ff7700">creator_trx_id</font>: 创建当前read view的事务ID</p>
+</li>
+</ul>
+<h4 id="3、可见性判断条件"><a href="#3、可见性判断条件" class="headerlink" title="3、可见性判断条件"></a>3、可见性判断条件</h4><ol>
+
+<li><font color="#ff7700">DATA_TRX_ID < up_limit_id || DATA_TRX_ID == creator_trx_id</font>(显示)</li>
+
+- 如果数据事务ID<font color="#ff7700">小于</font>read view中的<font color="#ff7700">最小活跃事务ID</font>，则可以肯定该数据是在当前事务启之前就已经存在了的,所以可以<font color="#ff7700">显示</font>
+
+- 或者数据的事务ID<font color="#ff7700">等于creator_trx_id</font>，那么说明这个数据就是<font color="#ff7700">当前事务生成</font>的，自己生成的数据自己当然能看见，所以这种情况下此数据也是可以<font color="#ff7700">显示</font>的。
+
+- 不满足该判断则进入下一个判断
+
+<li><font color="#ff7700">DATA_TRX_ID >= low_limit_id</font>(不显示)</li>
+
+- 如果数据事务ID<font color="#ff7700">大于</font>read view中的当前系统的<font color="#ff7700">最大事务ID</font>，则说明该数据是在当前read view<font color="#ff7700">创建之后产生</font>的，所以数据<font color="#ff7700">不显示</font>。如果<font color="#ff7700">小于</font>则进入<font color="#ff7700">下一个判断</font>
+
+<li>DATA_TRX_ID是否在<font color="#ff7700">活跃事务列表</font>(trx_ids)中</li>
+
+- <font color="#ff7700">不存在</font>：则说明read view产生的时候事务<font color="#ff7700">已经commit</font>了，这种情况数据则可以<font color="#ff7700">显示</font>
+
+- <font color="#ff7700">存在</font>：则代表Read View生成时刻，这个事务还在活跃，还<font color="#ff7700">没有Commit</font>，其修改的数据，当前事务<font color="#ff7700">不可见</font>
+
+</ol>
+
+<h4 id="4、Read-View生成时机"><a href="#4、Read-View生成时机" class="headerlink" title="4、Read View生成时机"></a>4、Read View生成时机</h4><ul>
+<li><p><font color="#ff7700">RC(READ COMMITTED)</font>隔离级别下，是<font color="#ff7700">每个快照读</font>都会生成并获取最新的Read View</p>
+</li>
+<li><p><font color="#ff7700">RR(REPEATED READ)</font>隔离级别下，则是<font color="#ff7700">同一个事务</font>中的<font color="#ff7700">第一个快照读</font>才会创建Read View, <font color="#ff7700">之后的快照读获取的都是同一个Read View</font>，之后的查询就不会重复生成了，所以一个事务的查询结果每次都是一样的。</p>
+</li>
+</ul>
+<h3 id="2-4、MVCC的整体流程"><a href="#2-4、MVCC的整体流程" class="headerlink" title="2.4、MVCC的整体流程"></a>2.4、MVCC的整体流程</h3><ol>
+
+<li>首先获取事务自己的版本号，也就是事务ID；</li>
+
+<li>获取Read View</li>
+
+<li>与Read View中的事务版本号进行比较</li>
+
+<li>如果不符合Read View规则，就需要从Undo Log中获取历史快照</li>
+
+<li>最后返回符合规则的历史版本数据</li>
+
+</ol>
+
+<h2 id="四、MVCC下的CRUD"><a href="#四、MVCC下的CRUD" class="headerlink" title="四、MVCC下的CRUD"></a>四、MVCC下的CRUD</h2><ul>
+<li><p>INSERT</p>
+<ul>
+<li>设置新记录的DATA_TRX_ID为当前事务ID，其他的采用默认的。</li>
+</ul>
+</li>
+<li><p>SELECT</p>
+<ul>
+<li><p>InnoDB必须找到一个数据行的版本至少和事务的版本一样老(也即它的版本号不大于事务的版本号)；这保证了不管是事务开始之前，或者事务创建时，或者修改了这行数据的时候，这行<font color="#ff7700">数据存在</font></p>
+</li>
+<li><p>这行数据的删除版本必须是未定义的或者比事务版本要大。这可以保证在<font color="#ff7700">事务开始之前</font>这行数据<font color="#ff7700">没有被删除</font></p>
+</li>
+<li><p>符合这两个条件的行可能会被当作查询结果而返回。</p>
+</li>
+</ul>
+</li>
+<li><p>UPDATE &lt;==&gt; INSERT + DELETE</p>
+<ul>
+<li><p>用X锁锁定该行（因为是写操作）；</p>
+</li>
+<li><p>记录redo log：将更新之后的数据记录到redo log中，以便日后使用；</p>
+</li>
+<li><p>记录undo log：将更新之后的数据记录到undo log中，设置当前数据行的DATA_TRX_ID为当前事务ID，回滚指针DATA_ROLL_PTR指向undo log中的当前数据行更新之前的数据行，同时设置更新之前的数据行的DATA_TRX_ID为当前事务ID，并且设置DELETE BIT为True，表示被删除。</p>
+</li>
+</ul>
+</li>
+<li><p>DELETE</p>
+<ul>
+<li>修改DATA_TRX_ID的值为当前执行删除操作的事务的ID，然后设置DELETE BIT为True，表示被删除</li>
+</ul>
+</li>
+</ul>
+<h2 id="五、MVCC是否解决了幻读"><a href="#五、MVCC是否解决了幻读" class="headerlink" title="五、MVCC是否解决了幻读"></a>五、MVCC是否解决了幻读</h2><h3 id="5-1-数据初始化"><a href="#5-1-数据初始化" class="headerlink" title="5.1 数据初始化"></a>5.1 数据初始化</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">CREATE TABLE kingdom(</span><br><span class="line">    id int not null,</span><br><span class="line">    name varchar(16) not null,</span><br><span class="line">    star int not null,</span><br><span class="line">    primary key(`id`)</span><br><span class="line">)ENGINE=InnoDB;</span><br><span class="line"></span><br><span class="line">INSERT INTO kingdom(id,name,star) values(1,&#x27;刘备&#x27;,5),(3,&#x27;孙权&#x27;,5)，(4,&#x27;马超&#x27;,5),(2,&#x27;曹操&#x27;,5);</span><br></pre></td></tr></table></figure>
+<h3 id="5-2-RR隔离级别下，一个快照读的例子"><a href="#5-2-RR隔离级别下，一个快照读的例子" class="headerlink" title="5.2 RR隔离级别下，一个快照读的例子"></a>5.2 RR隔离级别下，一个快照读的例子</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>执行顺序</th>
+<th>事务A</th>
+<th>事务B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>BEGIN;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>SELECT * FROM kingdom WHERE id&gt;2;</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>BEGIN;</td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td>INSERT INTO kingdom(id,name,star) value(5,’吕布’,5);</td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td>COMMIT;</td>
+</tr>
+<tr>
+<td>5</td>
+<td>SELECT * FROM kingdom WHERE id&gt;2;</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div align="center">
+
+<img src="/posts/c3ee3f83/RR快照读.jpg">
+
+</div>
+
+<p>可知，两次查询结果一致，没有幻读。</p>
+<h3 id="5-3-RR隔离级别下，一个当前读的例子"><a href="#5-3-RR隔离级别下，一个当前读的例子" class="headerlink" title="5.3 RR隔离级别下，一个当前读的例子"></a>5.3 RR隔离级别下，一个当前读的例子</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>执行顺序</th>
+<th>事务A</th>
+<th>事务B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>BEGIN;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>SELECT * FROM kingdom WHERE id&gt;2 LOCK IN share mode;</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>BEGIN;</td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td>INSERT INTO kingdom(id,name,star) value(5,’吕布’,5);</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div align="center">
+
+<img src="/posts/c3ee3f83/RR当前读.jpg">
+
+</div>
+
+<p>显然，事务B执行插入操作时，阻塞了</p>
+<p>因为事务A在执行<code>SELECT * FROM kingdom LOCK IN share mode;</code>(当前读)的时候，不仅在记录上加了锁，而且也加了间隙锁。</p>
+<p>因此，我们可以发现，RR隔离级别下，加锁的select, update, delete等语句，会使用间隙锁+ 临键锁，锁住索引记录之间的范围，避免范围间插入记录，以避免产生幻影行记录，那就是说RR隔离级别解决了幻读问题？？？</p>
+<h3 id="5-4-特殊场景"><a href="#5-4-特殊场景" class="headerlink" title="5.4 特殊场景"></a>5.4 特殊场景</h3><div class="table-container">
+<table>
+<thead>
+<tr>
+<th>执行顺序</th>
+<th>事务A</th>
+<th>事务B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>BEGIN;</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>SELECT * FROM kingdom WHERE id&gt;2;</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td></td>
+<td>BEGIN;</td>
+</tr>
+<tr>
+<td>4</td>
+<td></td>
+<td>INSERT INTO kingdom(id,name,star) value(5,’吕布’,5);</td>
+</tr>
+<tr>
+<td>5</td>
+<td></td>
+<td>COMMIT;</td>
+</tr>
+<tr>
+<td>6</td>
+<td>UPDATE kingdom SET name=’张机’ WHERE id=5;</td>
+<td></td>
+</tr>
+<tr>
+<td>7</td>
+<td>SELECT * FROM kingdom WHERE id&gt;2;</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div align="center">
+
+<img src="/posts/c3ee3f83/特殊情景.jpg">
+
+</div>
+
+<p>上图事务A中，多加了<code>UPDATE kingdom SET name=&#39;张机&#39; WHERE id=5;</code>这步操作，同一个事务，相同的sql，查出的结果集不同了.</p>
+<h3 id="5-5-总结"><a href="#5-5-总结" class="headerlink" title="5.5 总结"></a>5.5 总结</h3><ul>
+<li><p>对于快照读：通过MVCC来进行控制的，不用加锁。按照MVCC中规定的“语法”进行增删改查等操作，以避免幻读。（MVCC的具体内容参见上方第1点到第4点的分析）</p>
+</li>
+<li><p>对于当前读：通过next-key锁（行锁+gap锁）来解决问题的。</p>
+</li>
+</ul>
+<h2 id="六、相关内容"><a href="#六、相关内容" class="headerlink" title="六、相关内容"></a>六、相关内容</h2><ol>
+
+<li>
+
+[乐观锁与悲观锁](http://hcy6713.cn)
+
+</li>
+
+<li>
+
+[undo log、redo log、bin log](http://hcy6713.cn)
+
+</li>
+
+<li>
+
+[next-key锁](http://hcy6713.cn)
+
+</li>
+
+</ol>
+
     </div>
 
     
@@ -244,7 +664,7 @@
   </li>
   <li class="post-copyright-link">
     <strong>本文链接：</strong>
-    <a href="http://hcy6713.cn/posts/c3ee3f83/" title="多版本控制MVCC">http://hcy6713.cn/posts/c3ee3f83/</a>
+    <a href="http://hcy6713.cn/posts/c3ee3f83/" title="MYSQL之MVCC原理">http://hcy6713.cn/posts/c3ee3f83/</a>
   </li>
   <li class="post-copyright-license">
     <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
@@ -256,9 +676,9 @@
 
       <footer class="post-footer">
           <div class="post-tags">
-              <a href="/tags/%E6%95%B0%E6%8D%AE%E5%BA%93/" rel="tag"># 数据库</a>
-              <a href="/tags/%E5%B9%B6%E5%8F%91%E4%B8%80%E8%87%B4%E6%80%A7/" rel="tag"># 并发一致性</a>
-              <a href="/tags/%E9%94%81/" rel="tag"># 锁</a>
+              <a href="/tags/MVCC/" rel="tag"># MVCC</a>
+              <a href="/tags/undo-log/" rel="tag"># undo log</a>
+              <a href="/tags/read-view/" rel="tag"># read view</a>
           </div>
 
         
@@ -329,6 +749,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%80%E3%80%81%E6%A6%82%E5%BF%B5"><span class="nav-text">一、概念</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%8C%E3%80%81%E5%BF%AB%E7%85%A7%E8%AF%BB%E5%92%8C%E5%BD%93%E5%89%8D%E8%AF%BB"><span class="nav-text">二、快照读和当前读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E5%BF%AB%E7%85%A7%E8%AF%BB"><span class="nav-text">2.1 快照读</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-%E5%BD%93%E5%89%8D%E8%AF%BB"><span class="nav-text">2.2 当前读</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%89%E3%80%81%E5%AE%9E%E7%8E%B0%E6%9C%BA%E5%88%B6"><span class="nav-text">三、实现机制</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#2-1-%E9%9A%90%E8%97%8F%E5%AD%97%E6%AE%B5"><span class="nav-text">2.1 隐藏字段</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-2-Undo-log"><span class="nav-text">2.2 Undo log</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1%E3%80%81%E6%A6%82%E5%BF%B5"><span class="nav-text">1、概念</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2%E3%80%81Undo-log-%E7%9A%84%E7%94%A8%E9%80%94"><span class="nav-text">2、Undo log 的用途</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3%E3%80%81Undo-log-%E7%9A%84%E5%88%86%E7%B1%BB"><span class="nav-text">3、Undo log 的分类</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4%E3%80%81%E7%AE%80%E5%8D%95%E7%A4%BA%E4%BE%8B"><span class="nav-text">4、简单示例</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-3-Read-View"><span class="nav-text">2.3 Read View</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1%E3%80%81Read-View%E6%A6%82%E5%BF%B5"><span class="nav-text">1、Read View概念</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2%E3%80%81%E5%B1%9E%E6%80%A7"><span class="nav-text">2、属性</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#3%E3%80%81%E5%8F%AF%E8%A7%81%E6%80%A7%E5%88%A4%E6%96%AD%E6%9D%A1%E4%BB%B6"><span class="nav-text">3、可见性判断条件</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#4%E3%80%81Read-View%E7%94%9F%E6%88%90%E6%97%B6%E6%9C%BA"><span class="nav-text">4、Read View生成时机</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-4%E3%80%81MVCC%E7%9A%84%E6%95%B4%E4%BD%93%E6%B5%81%E7%A8%8B"><span class="nav-text">2.4、MVCC的整体流程</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%9B%9B%E3%80%81MVCC%E4%B8%8B%E7%9A%84CRUD"><span class="nav-text">四、MVCC下的CRUD</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%BA%94%E3%80%81MVCC%E6%98%AF%E5%90%A6%E8%A7%A3%E5%86%B3%E4%BA%86%E5%B9%BB%E8%AF%BB"><span class="nav-text">五、MVCC是否解决了幻读</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E6%95%B0%E6%8D%AE%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-text">5.1 数据初始化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-RR%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B8%8B%EF%BC%8C%E4%B8%80%E4%B8%AA%E5%BF%AB%E7%85%A7%E8%AF%BB%E7%9A%84%E4%BE%8B%E5%AD%90"><span class="nav-text">5.2 RR隔离级别下，一个快照读的例子</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-RR%E9%9A%94%E7%A6%BB%E7%BA%A7%E5%88%AB%E4%B8%8B%EF%BC%8C%E4%B8%80%E4%B8%AA%E5%BD%93%E5%89%8D%E8%AF%BB%E7%9A%84%E4%BE%8B%E5%AD%90"><span class="nav-text">5.3 RR隔离级别下，一个当前读的例子</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-%E7%89%B9%E6%AE%8A%E5%9C%BA%E6%99%AF"><span class="nav-text">5.4 特殊场景</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-5-%E6%80%BB%E7%BB%93"><span class="nav-text">5.5 总结</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%AD%E3%80%81%E7%9B%B8%E5%85%B3%E5%86%85%E5%AE%B9"><span class="nav-text">六、相关内容</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -357,7 +778,7 @@
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">5</span>
+        <span class="site-state-item-count">7</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
@@ -395,7 +816,7 @@
 
 <div class="theme-info">
   <div class="powered-by"></div>
-  <span class="post-count">博客全站共13.6k字</span>
+  <span class="post-count">博客全站共16.7k字</span>
 </div>
 
         
