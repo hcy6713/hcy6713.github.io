@@ -200,7 +200,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-03-04 20:41:19" itemprop="dateModified" datetime="2022-03-04T20:41:19+08:00">2022-03-04</time>
+                <time title="修改时间：2022-03-04 20:45:38" itemprop="dateModified" datetime="2022-03-04T20:45:38+08:00">2022-03-04</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -225,18 +225,12 @@
       
           <h2 id="一、概念"><a href="#一、概念" class="headerlink" title="一、概念"></a>一、概念</h2><p>MVVC (Multi-Version Concurrency Control) (注：与 MVCC 相对的，是<font color="#8888ff">基于锁的并发控制</font>，Lock-Based Concurrency Control)是一种<font color="#ff7700">基于多版本的并发控制协议</font>，只有在<font color="#ff7700">InnoDB</font>引擎下存在。</p>
 <ul>
-<li><p>MVCC 是为了<font color="#ff7700">实现事务的隔离</font>，通过<font color="#ff7700">版本号</font>，避免同一数据在不同事务间的竞争，可以把它当成基于多版本号的一种<font color="#ff7700">乐观锁</font>。</p>
-</li>
-<li><p>MVCC 只在<font color="#ff7700">提交读(READ COMMITTED)</font>和<font color="#ff7700">可重复读(REPEATABLE READ)</font>事务级别下工作；其他两个隔离级别和 MVCC 不兼容，因为未提交读(READ UNCOMMITTED)总是读取最新的数据行，而不是符合当前事务版本的数据行。而可串行化(SERIALIZABLE)则会对所有读取的<font color="#8888ff">表</font>都加锁。</p>
-</li>
-<li><p>MVCC 最大的好处：读不加锁，读写不冲突。在读多写少的<a target="_blank" rel="noopener" href="https://www.cnblogs.com/hhandbibi/p/7118740.html">OLTP</a>应用中，读写不冲突极大的<font color="#ff7700">增加了系统的并发性能</font>。</p>
-</li>
-<li><p>Oracle，PostgreSQL 等其他数据库系统也都实现了 MVCC，但各自的实现机制不尽相同，因为 MVCC 没有一个统一的实现标准。</p>
-</li>
-<li><p>可以认为 MVCC 是<font color="#ff7700">行级锁</font>的一个变种，但是它在很多情况下避免了加锁操作，因此开销更低。虽然实现机制有所不同，但大都<font color="#ff7700">实现了非阻塞的读操作，写操作也只锁定必要的行</font>。</p>
-</li>
-<li><p>MVCC 的实现方式有多种，典型的有<font color="#ff7700">乐观(optimistic)并发控制</font>和<font color="#ff7700">悲观(pessimistic)并发控制</font>。</p>
-</li>
+<li>MVCC 是为了<font color="#ff7700">实现事务的隔离</font>，通过<font color="#ff7700">版本号</font>，避免同一数据在不同事务间的竞争，可以把它当成基于多版本号的一种<font color="#ff7700">乐观锁</font>。</li>
+<li>MVCC 只在<font color="#ff7700">提交读(READ COMMITTED)</font>和<font color="#ff7700">可重复读(REPEATABLE READ)</font>事务级别下工作；其他两个隔离级别和 MVCC 不兼容，因为未提交读(READ UNCOMMITTED)总是读取最新的数据行，而不是符合当前事务版本的数据行。而可串行化(SERIALIZABLE)则会对所有读取的<font color="#8888ff">表</font>都加锁。</li>
+<li>MVCC 最大的好处：读不加锁，读写不冲突。在读多写少的<a target="_blank" rel="noopener" href="https://www.cnblogs.com/hhandbibi/p/7118740.html">OLTP</a>应用中，读写不冲突极大的<font color="#ff7700">增加了系统的并发性能</font>。</li>
+<li>Oracle，PostgreSQL 等其他数据库系统也都实现了 MVCC，但各自的实现机制不尽相同，因为 MVCC 没有一个统一的实现标准。</li>
+<li>可以认为 MVCC 是<font color="#ff7700">行级锁</font>的一个变种，但是它在很多情况下避免了加锁操作，因此开销更低。虽然实现机制有所不同，但大都<font color="#ff7700">实现了非阻塞的读操作，写操作也只锁定必要的行</font>。</li>
+<li>MVCC 的实现方式有多种，典型的有<font color="#ff7700">乐观(optimistic)并发控制</font>和<font color="#ff7700">悲观(pessimistic)并发控制</font>。</li>
 </ul>
 <h2 id="二、快照读和当前读"><a href="#二、快照读和当前读" class="headerlink" title="二、快照读和当前读"></a>二、快照读和当前读</h2><h3 id="2-1-快照读"><a href="#2-1-快照读" class="headerlink" title="2.1 快照读"></a>2.1 快照读</h3><p>快照读又叫<font color="#ff7700">一致性读</font>，读取的是<font color="#ff7700">快照数据</font>。<font color="#ff7700">不加锁的简单的SELECT都属于快照读</font>，即不加锁的非阻塞读</p>
 <p><code>SELECT * FROM table WHERE ...</code></p>
@@ -282,12 +276,9 @@
 
 <h3 id="2-2-Undo-log"><a href="#2-2-Undo-log" class="headerlink" title="2.2 Undo log"></a>2.2 Undo log</h3><h4 id="1、概念"><a href="#1、概念" class="headerlink" title="1、概念"></a>1、概念</h4><p>Undo log:撤回日志记录,也称<font color="#ff7700">版本链</font>。当前事务<font color="#ff7700">未提交之前</font>，undo log 保存了当前事务的正在操作的数据记录的所有版本的信息，undo log 中的数据可作为数据旧版本快照供其他并发事务进行<font color="#ff7700">快照读</font>。每次有其它事务提交对当前数据行的修改，都是添加到 undo log 中。undo log 是由每个数据行的多个不同的版本链接在一起构成的一个记录“链表”。</p>
 <ul>
-<li><p>InnoDB 对 undo log 的管理采用段的方式。<strong>rollback segment 称为回滚段，每个回滚段中有 1024 个 undo log segment</strong></p>
-</li>
-<li><p>MySQL5.5 以前，只支持 1 个 rollback segment(回滚段)，只能记录 1024 个 undo log segment<br>MySQL5.5 支持 128 个 rollback segment，即支持 128 * 1024 个 undo log segment<br>MySQL8.0 每个 Undo tablespace(默认为 2，可以动态增加，最多 127 个)可以创建 128 个 rollback segment</p>
-</li>
-<li><p>undo log 默认存放在共享表空间中。</p>
-</li>
+<li>InnoDB 对 undo log 的管理采用段的方式。<strong>rollback segment 称为回滚段，每个回滚段中有 1024 个 undo log segment</strong></li>
+<li>MySQL5.5 以前，只支持 1 个 rollback segment(回滚段)，只能记录 1024 个 undo log segment<br>MySQL5.5 支持 128 个 rollback segment，即支持 128 * 1024 个 undo log segment<br>MySQL8.0 每个 Undo tablespace(默认为 2，可以动态增加，最多 127 个)可以创建 128 个 rollback segment</li>
+<li>undo log 默认存放在共享表空间中。</li>
 </ul>
 <h4 id="2、Undo-log-的用途"><a href="#2、Undo-log-的用途" class="headerlink" title="2、Undo log 的用途"></a>2、Undo log 的用途</h4><ol>
 
@@ -298,10 +289,8 @@
 </ol>
 
 <h4 id="3、Undo-log-的分类"><a href="#3、Undo-log-的分类" class="headerlink" title="3、Undo log 的分类"></a>3、Undo log 的分类</h4><ul>
-<li><p>insert undo log<br>代表事务在insert新记录时产生的undo log , 只在事务回滚时需要，并且在事务提交后可以被立即丢弃</p>
-</li>
-<li><p>update undo log（主要）<br>事务在进行update或delete时产生的undo log ; 不仅在事务回滚时需要，在快照读时也需要；所以不能随便删除，只有在快速读或事务回滚不涉及该日志时，对应的日志才会被<font color="#ff7700">purge线程</font>统一清除</p>
-<ul>
+<li>insert undo log<br>代表事务在insert新记录时产生的undo log , 只在事务回滚时需要，并且在事务提交后可以被立即丢弃</li>
+<li>update undo log（主要）<br>事务在进行update或delete时产生的undo log ; 不仅在事务回滚时需要，在快照读时也需要；所以不能随便删除，只有在快速读或事务回滚不涉及该日志时，对应的日志才会被<font color="#ff7700">purge线程</font>统一清除<ul>
 <li>更新主键<br>聚簇索引和二级索引都无法进行in place update，都会产生两个版本<br>update分两步执行，先删除该行，再插入一行目标行</li>
 <li>更新非主键<br>聚簇索引可以in place update，二级索引产生两个版本<br>聚簇索引记录undo log，二级索引不记录undo log<br>更新二级索引，同时需要判断是否修改索引页面的MAX_TRX_ID</li>
 <li>删除操作<br>删除操作实际上不会直接删除，而只是标记为删除，最终的删除操作是purge线程完成的</li>
@@ -398,10 +387,8 @@
 </li>
 </ol>
 <h4 id="4、Read-View生成时机"><a href="#4、Read-View生成时机" class="headerlink" title="4、Read View生成时机"></a>4、Read View生成时机</h4><ul>
-<li><p><font color="#ff7700">RC(READ COMMITTED)</font>隔离级别下，是<font color="#ff7700">每个快照读</font>都会生成并获取最新的Read View</p>
-</li>
-<li><p><font color="#ff7700">RR(REPEATED READ)</font>隔离级别下，则是<font color="#ff7700">同一个事务</font>中的<font color="#ff7700">第一个快照读</font>才会创建Read View, <font color="#ff7700">之后的快照读获取的都是同一个Read View</font>，之后的查询就不会重复生成了，所以一个事务的查询结果每次都是一样的。</p>
-</li>
+<li><font color="#ff7700">RC(READ COMMITTED)</font>隔离级别下，是<font color="#ff7700">每个快照读</font>都会生成并获取最新的Read View</li>
+<li><font color="#ff7700">RR(REPEATED READ)</font>隔离级别下，则是<font color="#ff7700">同一个事务</font>中的<font color="#ff7700">第一个快照读</font>才会创建Read View, <font color="#ff7700">之后的快照读获取的都是同一个Read View</font>，之后的查询就不会重复生成了，所以一个事务的查询结果每次都是一样的。</li>
 </ul>
 <h3 id="2-4、MVCC的整体流程"><a href="#2-4、MVCC的整体流程" class="headerlink" title="2.4、MVCC的整体流程"></a>2.4、MVCC的整体流程</h3><ol>
 
@@ -418,33 +405,23 @@
 </ol>
 
 <h2 id="四、MVCC下的CRUD"><a href="#四、MVCC下的CRUD" class="headerlink" title="四、MVCC下的CRUD"></a>四、MVCC下的CRUD</h2><ul>
-<li><p>INSERT</p>
-<ul>
+<li>INSERT<ul>
 <li>设置新记录的DATA_TRX_ID为当前事务ID，其他的采用默认的。</li>
 </ul>
 </li>
-<li><p>SELECT</p>
-<ul>
-<li><p>InnoDB必须找到一个数据行的版本至少和事务的版本一样老(也即它的版本号不大于事务的版本号)；这保证了不管是事务开始之前，或者事务创建时，或者修改了这行数据的时候，这行<font color="#ff7700">数据存在</font></p>
-</li>
-<li><p>这行数据的删除版本必须是未定义的或者比事务版本要大。这可以保证在<font color="#ff7700">事务开始之前</font>这行数据<font color="#ff7700">没有被删除</font></p>
-</li>
-<li><p>符合这两个条件的行可能会被当作查询结果而返回。</p>
-</li>
+<li>SELECT<ul>
+<li>InnoDB必须找到一个数据行的版本至少和事务的版本一样老(也即它的版本号不大于事务的版本号)；这保证了不管是事务开始之前，或者事务创建时，或者修改了这行数据的时候，这行<font color="#ff7700">数据存在</font></li>
+<li>这行数据的删除版本必须是未定义的或者比事务版本要大。这可以保证在<font color="#ff7700">事务开始之前</font>这行数据<font color="#ff7700">没有被删除</font></li>
+<li>符合这两个条件的行可能会被当作查询结果而返回。</li>
 </ul>
 </li>
-<li><p>UPDATE &lt;==&gt; INSERT + DELETE</p>
-<ul>
-<li><p>用X锁锁定该行（因为是写操作）；</p>
-</li>
-<li><p>记录redo log：将更新之后的数据记录到redo log中，以便日后使用；</p>
-</li>
-<li><p>记录undo log：将更新之后的数据记录到undo log中，设置当前数据行的DATA_TRX_ID为当前事务ID，回滚指针DATA_ROLL_PTR指向undo log中的当前数据行更新之前的数据行，同时设置更新之前的数据行的DATA_TRX_ID为当前事务ID，并且设置DELETE BIT为True，表示被删除。</p>
-</li>
+<li>UPDATE &lt;==&gt; INSERT + DELETE<ul>
+<li>用X锁锁定该行（因为是写操作）；</li>
+<li>记录redo log：将更新之后的数据记录到redo log中，以便日后使用；</li>
+<li>记录undo log：将更新之后的数据记录到undo log中，设置当前数据行的DATA_TRX_ID为当前事务ID，回滚指针DATA_ROLL_PTR指向undo log中的当前数据行更新之前的数据行，同时设置更新之前的数据行的DATA_TRX_ID为当前事务ID，并且设置DELETE BIT为True，表示被删除。</li>
 </ul>
 </li>
-<li><p>DELETE</p>
-<ul>
+<li>DELETE<ul>
 <li>修改DATA_TRX_ID的值为当前执行删除操作的事务的ID，然后设置DELETE BIT为True，表示被删除</li>
 </ul>
 </li>
