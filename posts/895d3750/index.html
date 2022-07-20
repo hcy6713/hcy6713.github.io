@@ -32,7 +32,7 @@
 <meta property="og:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96.png">
 <meta property="og:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word(64bit">
 <meta property="article:published_time" content="2022-07-20T12:01:11.000Z">
-<meta property="article:modified_time" content="2022-07-20T17:19:02.192Z">
+<meta property="article:modified_time" content="2022-07-20T17:25:26.957Z">
 <meta property="article:author" content="hcy6713">
 <meta property="article:tag" content="并发">
 <meta property="article:tag" content="synchronized">
@@ -208,7 +208,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-21 01:19:02" itemprop="dateModified" datetime="2022-07-21T01:19:02+08:00">2022-07-21</time>
+                <time title="修改时间：2022-07-21 01:25:26" itemprop="dateModified" datetime="2022-07-21T01:25:26+08:00">2022-07-21</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -310,12 +310,16 @@
 </div>
 <p>在运行期间，Mark Word 里存储的数据会随着锁标记位的变化而变化。Mark Word 可能变化为存储以下 4 种数据， 如下表所示</p>
 <p><img src="/posts/895d3750/Mark%20Word%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96.png" alt="Mark Word 的状态变化"></p>
+<blockquote>
 <font color="Gray" size="2">注：GC标记（垃圾回收标记），Epoch（偏向锁的时间戳）</font>
 
+</blockquote>
 <p>在 64 位虚拟机下，Mark Word 是 64 bit 大小的，其存储结构如下表所示</p>
 <p><img src="/posts/895d3750/Mark%20Word(64bit" alt>的存储结构.png)</p>
+<blockquote>
 <font color="Gray" size="2">注：pth_to_lock_record（轻量级锁状态下，指向栈中锁记录的指针），ptr_to_heavyweight_monitor（重量级锁状态下，指向对象监视器Monitor的指针）</font>
 
+</blockquote>
 <h2 id="3-monitor"><a href="#3-monitor" class="headerlink" title="3 monitor"></a>3 monitor</h2><p>什么是monitor？ 可以把它理解一个同步工具，也可以描述为 一种同步机制，它通常被描述为一个对象。</p>
 <p>与一切皆对象一样，所有的Java对象是天生的monitor，每一个Java对象都有成为Monitor的潜质，因为在Java的设计中 ，<font color="Red">每一个Java对象自打娘胎里出来就带了一把看不见的锁，它叫做内部锁或者Monitor锁</font>。JVM 基于进入和退出 monitor 对象来实现方法同步和代码块同步，但两者的实现细节不一样。</p>
 <h3 id="3-1-代码块同步"><a href="#3-1-代码块同步" class="headerlink" title="3.1 代码块同步"></a>3.1 代码块同步</h3><p>代码块同步是使用<font color="#dd4466"> monitorenter 和 monitorexit 指令</font>实现的。根据 JVM 规范的要求，线程在执行 monitorenter 指令时，首先要去尝试获取对象所对应的 monitor 的所有权，即获取对象的锁，如果这个对象没被锁定，或者当前线程已经持有了那个对象的锁，就把锁的计数器的值增加一，而在执行 monitorexit 指令时会将锁计数器的值减一。一旦计数器的值为零，锁随即就被释放了。如果获取对象锁失败，那当前线程就应当被阻塞等待，直到请求锁定的对象被持有它的线程释放为止。</p>
@@ -414,7 +418,9 @@
 </blockquote>
 <p>CAS为什么会引入本地延迟？这要从SMP（对称多处理器）架构说起，下图大概表明了SMP的结构：</p>
 <div align="center">
+
 <image src="java中的锁/SMP.png" style="zoom:80%">
+
 </image></div>
 
 <p>SMP（对称多处理器）架构</p>
@@ -426,11 +432,11 @@
 <p>而CAS恰好会导致Cache一致性流量，如果有很多线程都共享同一个对象，当某个Core CAS成功时必然会引起总线风暴，这就是所谓的本地延迟，本质上偏向锁就是为了消除CAS，降低Cache一致性流量。</p>
 <p>Cache一致性：</p>
 <blockquote>
-<p>上面提到Cache一致性，其实是有协议支持的，现在通用的协议是MESI（最早由Intel开始支持），具体参考：<a target="_blank" rel="noopener" href="http://en.wikipedia.org/wiki/MESI_protocol。">http://en.wikipedia.org/wiki/MESI_protocol。</a></p>
+<p>上面提到Cache一致性，其实是有协议支持的，现在通用的协议是MESI（最早由Intel开始支持），具体参考：<br><a target="_blank" rel="noopener" href="http://en.wikipedia.org/wiki/MESI_protocol。">http://en.wikipedia.org/wiki/MESI_protocol。</a></p>
 </blockquote>
 <p>Cache一致性流量的例外情况：</p>
 <blockquote>
-<p>其实也不是所有的CAS都会导致总线风暴，这跟Cache一致性协议有关，具体参考：<a target="_blank" rel="noopener" href="http://blogs.oracle.com/dave/entry/biased_locking_in_hotspot">http://blogs.oracle.com/dave/entry/biased_locking_in_hotspot</a></p>
+<p>其实也不是所有的CAS都会导致总线风暴，这跟Cache一致性协议有关，具体参考：<br><a target="_blank" rel="noopener" href="http://blogs.oracle.com/dave/entry/biased_locking_in_hotspot">http://blogs.oracle.com/dave/entry/biased_locking_in_hotspot</a></p>
 </blockquote>
 <p>NUMA(<em>Non Uniform Memory Access Achitecture</em>）架构：</p>
 <blockquote>
@@ -465,9 +471,9 @@
 <li>在线程进入同步块时，如果同步对象锁状态为无锁状态（锁标志位为“01”状态，是否为偏向锁为“0”），虚拟机首先将在当前线程的栈帧中建立一个名为锁记录（Lock Record）的空间，用于存储锁对象目前的Mark Word的拷贝，官方称之为 Displaced Mark Word。此时线程堆栈与对象头的状态如下图所示：</li>
 </ol>
 <div align="center">
-<image src="/java中的锁/轻量级锁cas_before.png" style="zoom:50%">
 
-轻量级锁CAS操作之前线程堆栈与对象的状态
+<image src="java中的锁/轻量级锁cas_before.png" style="zoom:50%">
+
 </image></div>
 
 <ol>
@@ -479,9 +485,9 @@
 </li>
 </ol>
 <div align="center">
+
 <image src="/java中的锁/轻量级锁cas_after.png" style="zoom:40%">
 
-轻量级锁CAS操作之后线程堆栈与对象的状态
 </image></div>
 
 <ol>
@@ -733,7 +739,7 @@
 
 <div class="theme-info">
   <div class="powered-by"></div>
-  <span class="post-count">博客全站共24.8k字</span>
+  <span class="post-count">博客全站共24.7k字</span>
 </div>
 
         
