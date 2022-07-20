@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+  <link rel="stylesheet" href="/lib/pace/pace-theme-mac-osx.min.css">
+  <script src="/lib/pace/pace.min.js"></script>
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"hcy6713.cn","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":true,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="1 基本使用synchronized是Java中解决并发问题的一种最常用的方法，也是最简单的一种方法。 从语法上讲，Synchronized可以把任何一个非null对象作为”锁”，在HotSpot JVM实现中，锁有个专门的名字：对象监视器(Object Monitor)。 synchronized总共有三种用法：  当synchronized作用在实例方法时，监视器锁(monitor)便是对象实">
+<meta property="og:type" content="article">
+<meta property="og:title" content="synchronized的实现原理">
+<meta property="og:url" content="http://hcy6713.cn/posts/895d3750/index.html">
+<meta property="og:site_name" content="hcy6713">
+<meta property="og:description" content="1 基本使用synchronized是Java中解决并发问题的一种最常用的方法，也是最简单的一种方法。 从语法上讲，Synchronized可以把任何一个非null对象作为”锁”，在HotSpot JVM实现中，锁有个专门的名字：对象监视器(Object Monitor)。 synchronized总共有三种用法：  当synchronized作用在实例方法时，监视器锁(monitor)便是对象实">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96.png">
+<meta property="og:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word(64bit">
+<meta property="article:published_time" content="2022-07-20T12:01:11.000Z">
+<meta property="article:modified_time" content="2022-07-20T16:59:48.863Z">
+<meta property="article:author" content="hcy6713">
+<meta property="article:tag" content="并发">
+<meta property="article:tag" content="synchronized">
+<meta property="article:tag" content="锁">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96.png">
+
+<link rel="canonical" href="http://hcy6713.cn/posts/895d3750/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>synchronized的实现原理 | hcy6713</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">hcy6713</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="archive fa-fw"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="user fa-fw"></i>关于</a>
+
+  </li>
+        <li class="menu-item menu-item-resources">
+
+    <a href="/resources/" rel="section"><i class="download fa-fw"></i>资源</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://hcy6713.cn/posts/895d3750/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/me.png">
+      <meta itemprop="name" content="hcy6713">
+      <meta itemprop="description" content="选择有时候比努力更重要">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="hcy6713">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          synchronized的实现原理
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2022-07-20 20:01:11" itemprop="dateCreated datePublished" datetime="2022-07-20T20:01:11+08:00">2022-07-20</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2022-07-21 00:59:48" itemprop="dateModified" datetime="2022-07-21T00:59:48+08:00">2022-07-21</time>
+              </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/Java%E5%B9%B6%E5%8F%91-JUC/" itemprop="url" rel="index"><span itemprop="name">Java并发(JUC)</span></a>
+                </span>
+            </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="1-基本使用"><a href="#1-基本使用" class="headerlink" title="1 基本使用"></a>1 基本使用</h2><p>synchronized是Java中解决并发问题的一种最常用的方法，也是最简单的一种方法。</p>
+<p>从语法上讲，Synchronized可以把任何一个非null对象作为”锁”，在HotSpot JVM实现中，锁有个专门的名字：对象监视器(Object Monitor)。</p>
+<p>synchronized总共有三种用法：</p>
+<ol>
+<li><p>当synchronized作用在<font color="#dd4466">实例方法</font>时，监视器锁(monitor)便是对象实例(this)</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title">method</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">// code</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>当synchronized作用在<font color="#dd4466">静态方法</font>时，监视器锁(monitor)便是对象的Class实例，因为Class数据存在于永久代，因此静态方法锁相当于该类的一个全局锁</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title">method</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">// code</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>当synchronized作用在同步<font color="#dd4466">代码块</font>时，监视器锁(monitor)便是括号里配置的对象</p>
+<ul>
+<li>实例方法中的方法块<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">add</span><span class="params">()</span> </span>&#123;</span><br><span class="line">   <span class="keyword">synchronized</span>(A) &#123;</span><br><span class="line">       <span class="comment">// code   </span></span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>静态方法中的方法块<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">add</span><span class="params">()</span> </span>&#123;</span><br><span class="line">   <span class="keyword">synchronized</span>(A) &#123;</span><br><span class="line">       <span class="comment">// code   </span></span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="2-Java对象头"><a href="#2-Java对象头" class="headerlink" title="2 Java对象头"></a>2 Java对象头</h2></li>
+</ul>
+</li>
+</ol>
+<p>在 JVM 中对象布局分为三块区域：对象头、对象体（对象属性和值）、对齐数据。 synchronized用的所就是存在 Java 对象头中的。如果对象是数组类型，则虚拟机用 3 个字宽 (Word) 存储对象头，如果对象是非数组类型，则用 2 字宽存储对象头。在 32 位虚拟机中， 1 字宽等于 4 字节，即 32 bit，如下表所示</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:center">长度</th>
+<th style="text-align:center">内容</th>
+<th style="text-align:center">说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">32/64bit</td>
+<td style="text-align:center">Mark Word</td>
+<td style="text-align:center">存储对象的 hashcode 或锁信息等</td>
+</tr>
+<tr>
+<td style="text-align:center">32/64bit</td>
+<td style="text-align:center">Class Metadata Address</td>
+<td style="text-align:center">存储指向对象类型数据的指针，判断对象属于哪个类的实例</td>
+</tr>
+<tr>
+<td style="text-align:center">32/64bit</td>
+<td style="text-align:center">Array Length</td>
+<td style="text-align:center">数组的长度（如果当前对象是数组）</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Java 对象头里的 Mark Word 里默认存储对象的 hashcode、分代年龄和锁标记位。 32 位 JVM 的 Mark Word 的默认存储结构如下表所示</p>
+<div class="table-container">
+<table>
+<thead>
+<tr>
+<th style="text-align:center">锁状态</th>
+<th style="text-align:center">25bit</th>
+<th style="text-align:center">4bit</th>
+<th style="text-align:center">1bit 是否是偏向锁</th>
+<th style="text-align:center">2bit 锁标记位</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">无锁状态</td>
+<td style="text-align:center">对象的 hashcode</td>
+<td style="text-align:center">对象分代年龄</td>
+<td style="text-align:center">0</td>
+<td style="text-align:center">01</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>在运行期间，Mark Word 里存储的数据会随着锁标记位的变化而变化。Mark Word 可能变化为存储以下 4 种数据， 如下表所示</p>
+<p><img src="/posts/895d3750/Mark%20Word%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96.png" alt="Mark Word 的状态变化"></p>
+<font color="Gray" size="2">注：GC标记（垃圾回收标记），Epoch（偏向锁的时间戳）</font>
+
+<p>在 64 位虚拟机下，Mark Word 是 64 bit 大小的，其存储结构如下表所示</p>
+<p><img src="/posts/895d3750/Mark%20Word(64bit" alt>的存储结构.png)</p>
+<font color="Gray" size="2">注：pth_to_lock_record（轻量级锁状态下，指向栈中锁记录的指针），ptr_to_heavyweight_monitor（重量级锁状态下，指向对象监视器Monitor的指针）</font>
+
+<h2 id="3-monitor"><a href="#3-monitor" class="headerlink" title="3 monitor"></a>3 monitor</h2><p>什么是monitor？ 可以把它理解一个同步工具，也可以描述为 一种同步机制，它通常被描述为一个对象。</p>
+<p>与一切皆对象一样，所有的Java对象是天生的monitor，每一个Java对象都有成为Monitor的潜质，因为在Java的设计中 ，<font color="Red">每一个Java对象自打娘胎里出来就带了一把看不见的锁，它叫做内部锁或者Monitor锁</font>。JVM 基于进入和退出 monitor 对象来实现方法同步和代码块同步，但两者的实现细节不一样。</p>
+<h3 id="3-1-代码块同步"><a href="#3-1-代码块同步" class="headerlink" title="3.1 代码块同步"></a>3.1 代码块同步</h3><p>代码块同步是使用<font color="#dd4466"> monitorenter 和 monitorexit 指令</font>实现的。根据 JVM 规范的要求，线程在执行 monitorenter 指令时，首先要去尝试获取对象所对应的 monitor 的所有权，即获取对象的锁，如果这个对象没被锁定，或者当前线程已经持有了那个对象的锁，就把锁的计数器的值增加一，而在执行 monitorexit 指令时会将锁计数器的值减一。一旦计数器的值为零，锁随即就被释放了。如果获取对象锁失败，那当前线程就应当被阻塞等待，直到请求锁定的对象被持有它的线程释放为止。</p>
+<p>monitorenter 指令是在编译后插入到同步代码块的开始位置，而 monitorexit 是插入到方法结束处和异常处，JVM 要保证每个 monitorenter 必须有对应的 monitorexit(一个monitorenter可能对应多个monitorexit) 与之配对</p>
+<h3 id="3-2-方法同步"><a href="#3-2-方法同步" class="headerlink" title="3.2 方法同步"></a>3.2 方法同步</h3><p>方法级的同步是隐式，即无需通过字节码指令来控制的，它实现在方法调用和返回操作之中。JVM可以从方法常量池中的方法表结构(method_info Structure) 中的 ACC_SYNCHRONIZED 访问标志区分一个方法是否同步方法。当方法调用时，调用指令将会 检查方法的 ACC_SYNCHRONIZED 访问标志是否被设置，如果设置了，执行线程将先持有monitor（虚拟机规范中用的是管程一词）， 然后再执行方法，最后再方法完成(无论是正常完成还是非正常完成)时释放monitor。在方法执行期间，执行线程持有了monitor，其他任何线程都无法再获得同一个monitor。如果一个同步方法执行期间抛 出了异常，并且在方法内部无法处理此异常，那这个同步方法所持有的monitor将在异常抛到同步方法之外时自动释放。</p>
+<h2 id="4-ObjectMonitor"><a href="#4-ObjectMonitor" class="headerlink" title="4 ObjectMonitor"></a>4 ObjectMonitor</h2><p>在Java虚拟机(HotSpot)中，monitor是由ObjectMonitor实现的（位于HotSpot虚拟机源码ObjectMonitor.hpp文件，C++实现的）。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">ObjectMonitor</span>() &#123;</span><br><span class="line">    _header       = <span class="literal">NULL</span>;</span><br><span class="line">    _count        = <span class="number">0</span>;</span><br><span class="line">    _waiters      = <span class="number">0</span>,       <span class="comment">// 等待中的线程数</span></span><br><span class="line">    _recursions   = <span class="number">0</span>;       <span class="comment">// 线程重入次数</span></span><br><span class="line">    _object       = <span class="literal">NULL</span>;    <span class="comment">// 存储该 monitor 的对象</span></span><br><span class="line">    _owner        = <span class="literal">NULL</span>;    <span class="comment">// 指向拥有该 monitor 的线程</span></span><br><span class="line">    _WaitSet      = <span class="literal">NULL</span>;    <span class="comment">// 等待线程 双向循环链表_WaitSet 指向第一个节点</span></span><br><span class="line">    _WaitSetLock  = <span class="number">0</span> ;</span><br><span class="line">    _Responsible  = <span class="literal">NULL</span> ;</span><br><span class="line">    _succ         = <span class="literal">NULL</span> ;</span><br><span class="line">    _cxq          = <span class="literal">NULL</span> ;   <span class="comment">// 多线程竞争锁时的单向链表</span></span><br><span class="line">    FreeNext      = <span class="literal">NULL</span> ;</span><br><span class="line">    _EntryList    = <span class="literal">NULL</span> ;   <span class="comment">// _owner 从该双向循环链表中唤醒线程，</span></span><br><span class="line">    _SpinFreq     = <span class="number">0</span> ;</span><br><span class="line">    _SpinClock    = <span class="number">0</span> ;</span><br><span class="line">    OwnerIsThread = <span class="number">0</span> ;</span><br><span class="line">    _previous_owner_tid = <span class="number">0</span>; <span class="comment">// 前一个拥有此监视器的线程 ID</span></span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+<p>ObjectMonitor中有几个关键属性：</p>
+<ul>
+<li><p><strong>_owner</strong></p>
+<blockquote>
+<p>初始时为 NULL。当有线程占有该 monitor 时 owner 标记为该线程的 ID。当线程释放 monitor 时 owner 恢复为 NULL。owner 是一个临界资源 JVM 是通过 CAS 操作来保证其线程安全的。</p>
+</blockquote>
+</li>
+<li><p><strong>_cxq</strong></p>
+<blockquote>
+<p>竞争队列,所有请求锁的线程首先会被放在这个队列中（单向）。_cxq 是一个临界资源 JVM 通过 CAS 原子指令来修改_cxq 队列。</p>
+<p>每当有新来的节点入队，它的 next 指针总是指向之前队列的头节点，而_cxq 指针会指向该新入队的节点，所以是后来居上。</p>
+</blockquote>
+</li>
+<li><p><strong>_EntryList</strong></p>
+<blockquote>
+<p>_cxq 队列中有资格成为候选资源的线程会被移动到该队列中。</p>
+</blockquote>
+</li>
+<li><p><strong>_WaitSet</strong></p>
+<blockquote>
+<p>等待队列,被阻塞的线程会被放在该队列中。</p>
+</blockquote>
+</li>
+<li><p><strong>_recursions</strong></p>
+<blockquote>
+<p>锁的重入次数</p>
+</blockquote>
+</li>
+<li><p><strong>_count</strong></p>
+<blockquote>
+<p>记数器</p>
+</blockquote>
+</li>
+</ul>
+<h3 id="4-1-monitor竞争过程"><a href="#4-1-monitor竞争过程" class="headerlink" title="4.1 monitor竞争过程"></a>4.1 monitor竞争过程</h3><ol>
+<li><p>通过 CAS 尝试把 monitor 的 owner 字段设置为当前线程。</p>
+</li>
+<li><p>如果设置之前的 owner 指向当前线程，说明当前线程再次进入 monitor，即重入锁执行 recursions ++ , 记录重入的次数。</p>
+</li>
+<li><p>如果当前线程是第一次进入该 monitor, 设置 recursions 为 1,_owner 为当前线程，该线程成功获得锁并返回。</p>
+</li>
+<li><p>如果获取锁失败，则等待锁的释放。</p>
+</li>
+</ol>
+<h3 id="4-2-monitor等待"><a href="#4-2-monitor等待" class="headerlink" title="4.2 monitor等待"></a>4.2 monitor等待</h3><ol>
+<li><p>当前线程被封装成 ObjectWaiter 对象 node，状态设置成 ObjectWaiter::TS_CXQ。</p>
+</li>
+<li><p>for 循环通过 CAS 把 node 节点 push 到_cxq列表中，同一时刻可能有多个线程把自己的 node 节点 push 到_cxq列表中。</p>
+</li>
+<li><p>node 节点 push 到_cxq 列表之后，通过自旋尝试获取锁，如果还是没有获取到锁则通过 park 将当前线程挂起等待被唤醒。</p>
+</li>
+<li><p>当该线程被唤醒时会从挂起的点继续执行，通过 ObjectMonitor::TryLock 尝试获取锁。</p>
+</li>
+</ol>
+<h2 id="5-锁的优化"><a href="#5-锁的优化" class="headerlink" title="5 锁的优化"></a>5 锁的优化</h2><h3 id="5-1-自旋锁"><a href="#5-1-自旋锁" class="headerlink" title="5.1 自旋锁"></a>5.1 自旋锁</h3><p>互斥同步对性能最大的影响是阻塞的实现，挂起线程和恢复线程的操作都需要转入内核态中完成，这些操作给 JVM 的并发性能带来了很大的压力。同时，也注意到在许多应用上，共享数据的锁定状态只会持续很短的一段时间，为了这段时间去挂起和恢复线程并不值得。现在绝大多数的个人电脑和服务器都是多路(核)处理器系统，如果物理机器有一个以上的处理器或者处理器核心，能让两个或以上的线程同时并行执行，我们就可以让后面请求锁的那个线程“稍等一会”，但不放弃处理器的执行时间，看看持有锁的线程是否很快就会释放锁。为了让线程等待，我们只须让线程执行一个忙循环(自旋)，这项技术就是所谓的<font color="#dd4466">自旋锁</font></p>
+<p>自旋锁在JDK 1.4.2 中就已经引人，只不过默认是关闭的，可以使用-XX:+UseSpinning数来开启，在JDK6中已经改为默认开启了。自旋等待不能代替阻塞，且先不说对处自旋是一种获取锁的机制并不是一个锁状态。在膨胀为重量级锁的过程中或重入时会多次尝试自旋获取锁以避免线程唤醒的开销，但是它会占用 CPU 的时间因此如果同步代码块执行时间很短，自旋等待的效果就很好，反之则浪费了 CPU 资源。</p>
+<p>因此自选等待的时间必须有一定的限度。默认情况下自旋次数是 10 次，用户可以使用参数 -XX：PreBlockSpin 来更改。</p>
+<h4 id="5-1-1-适应性自旋锁"><a href="#5-1-1-适应性自旋锁" class="headerlink" title="5.1.1 适应性自旋锁"></a>5.1.1 适应性自旋锁</h4><p>JDK 1.6引入了更加聪明的自旋锁，即<font color="#dd4466">自适应自旋锁</font>。所谓自适应就意味着自旋的次数不再是固定的，它是由前一次在同一个锁上的自旋时间及锁的拥有者的状态来决定。那它如何进行适应性自旋呢？ </p>
+<font color="#dd4466">线程如果自旋成功了，那么下次自旋的次数会更加多，因为虚拟机认为既然上次成功了，那么此次自旋也很有可能会再次成功，那么它就会允许自旋等待持续的次数更多。反之，如果对于某个锁，很少有自旋能够成功，那么在以后要或者这个锁的时候自旋的次数会减少甚至省略掉自旋过程，以免浪费处理器资源。</font>
+
+<p>有了自适应自旋锁，随着程序运行和性能监控信息的不断完善，虚拟机对程序锁的状况预测会越来越准确，虚拟机会变得越来越聪明。</p>
+<h3 id="5-2-锁消除"><a href="#5-2-锁消除" class="headerlink" title="5.2 锁消除"></a>5.2 锁消除</h3><p>为了保证数据的完整性，在进行操作时需要对这部分操作进行同步控制，但是在有些情况下，JVM检测到不可能存在共享数据竞争，这是JVM会对这些同步锁进行锁消除。</p>
+<blockquote>
+<p>锁消除的依据来源于逃逸分析的数据支持</p>
+</blockquote>
+<p>如果不存在竞争，为什么还需要加锁呢？所以锁消除可以节省毫无意义的请求锁的时间。变量是否逃逸，对于虚拟机来说需要使用数据流分析来确定，但是对于程序员来说这还不清楚么？在明明知道不存在数据竞争的代码块前加上同步吗？但是有时候程序并不是我们所想的那样？虽然没有显示使用锁，但是在使用一些JDK的内置API时，如StringBuffer、Vector、HashTable等，这个时候会存在隐形的加锁操作。比如StringBuffer的append()方法，Vector的add()方法：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">vectorTest</span><span class="params">()</span></span>&#123;</span><br><span class="line">    Vector&lt;String&gt; vector = <span class="keyword">new</span> Vector&lt;String&gt;();</span><br><span class="line">    <span class="keyword">for</span>(<span class="keyword">int</span> i = <span class="number">0</span> ; i &lt; <span class="number">10</span> ; i++)&#123;</span><br><span class="line">        vector.add(i + <span class="string">&quot;&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    System.out.println(vector);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在运行这段代码时，JVM可以明显检测到变量vector没有逃逸出方法vectorTest()之外，所以JVM可以大胆地将vector内部的加锁操作消除。</p>
+<h3 id="5-3-锁粗化"><a href="#5-3-锁粗化" class="headerlink" title="5.3 锁粗化"></a>5.3 锁粗化</h3><p>在使用同步锁的时候，需要让同步块的作用范围尽可能小——仅在共享数据的实际作用域中才进行同步，这样做的目的是 为了使需要同步的操作数量尽可能缩小，如果存在锁竞争，那么等待锁的线程也能尽快拿到锁。</p>
+<p>在大多数的情况下，上述观点是正确的。但是如果一系列的连续加锁解锁操作，可能会导致不必要的性能损耗，所以引入锁粗化的概念。</p>
+<p>锁粗化概念比较好理解，就是将多个连续的加锁、解锁操作连接在一起，扩展成一个范围更大的锁</p>
+<p>如上面实例：</p>
+<blockquote>
+<font color="#dd4466">vector每次add的时候都需要加锁操作，JVM检测到对同一个对象（vector）连续加锁、解锁操作，会合并一个更大范围的加锁、解锁操作，即加锁解锁操作会移到for循环之外，这样只需要加锁一次就可以了。</font>
+
+</blockquote>
+<h3 id="5-4-偏向锁"><a href="#5-4-偏向锁" class="headerlink" title="5.4 偏向锁"></a>5.4 偏向锁</h3><p>偏向锁是JDK6中的重要引进，因为HotSpot作者经过研究实践发现，在大多数情况下，锁不仅不存在多线程竞争，而且总是由同一线程多次获得，为了让线程获得锁的代价更低，引进了偏向锁。</p>
+<font color="#dd4466">偏向锁是在单线程执行代码块时使用的机制，如果在多线程并发的环境下（即线程A尚未执行完同步代码块，线程B发起了申请锁的申请），则一定会转化为轻量级锁或者重量级锁。</font>
+
+<p>在JDK5中偏向锁默认是关闭的，而到了JDK6中偏向锁已经默认开启。如果并发数较大同时同步代码块执行时间较长，则被多个线程同时访问的概率就很大，就可以使用参数-XX:-UseBiasedLocking=false来禁止偏向锁(但这是个JVM参数，不能针对某个对象锁来单独设置)。</p>
+<p>引入偏向锁主要目的是：为了在没有多线程竞争的情况下尽量减少不必要的轻量级锁执行路径。因为轻量级锁的加锁解锁操作是需要依赖多次CAS原子指令的，而偏向锁只需要在置换ThreadID的时候依赖一次CAS原子指令（由于一旦出现多线程竞争的情况就必须撤销偏向锁，所以偏向锁的撤销操作的性能损耗也必须小于节省下来的CAS原子指令的性能消耗）。</p>
+<blockquote>
+<p>轻量级锁是为了在线程交替执行同步块时提高性能，而偏向锁则是在只有一个线程执行同步块时进一步提高性能。</p>
+</blockquote>
+<p>那么偏向锁是如何来减少不必要的CAS操作呢？首先我们看下无竞争下锁存在什么问题：</p>
+<blockquote>
+<font color="aa88ff">现在几乎所有的锁都是可重入的，即已经获得锁的线程可以多次锁住/解锁监视对象，按照之前的HotSpot设计，每次加锁/解锁都会涉及到一些CAS操作（比如对等待队列的CAS操作），CAS操作会延迟本地调用，因此偏向锁的想法是 一旦线程第一次获得了监视对象，之后让监视对象“偏向”这个线程，之后的多次调用则可以避免CAS操作，说白了就是置个变量，如果发现为true则无需再走各种加锁/解锁流程。</font>
+
+</blockquote>
+<p>CAS为什么会引入本地延迟？这要从SMP（对称多处理器）架构说起，下图大概表明了SMP的结构：</p>
+<div align="center">
+<image src="java中的锁/SMP.png" style="zoom:80%">
+</image></div>
+
+<p>SMP（对称多处理器）架构</p>
+<blockquote>
+<p>其意思是 所有的CPU会共享一条系统总线（BUS），靠此总线连接主存。每个核都有自己的一级缓存，各核相对于BUS对称分布，因此这种结构称为“对称多处理器”。</p>
+</blockquote>
+<p>而CAS的全称为<font color="#dd4466">Compare-And-Swap</font>，是一条CPU的原子指令，其作用是让CPU比较后原子地更新某个位置的值，经过调查发现，其实现方式是基于硬件平台的汇编指令，就是说<font color="#dd4466">CAS是靠硬件实现的</font>，JVM只是封装了汇编调用，那些AtomicInteger类便是使用了这些封装后的接口。</p>
+<p>例如：Core1和Core2可能会同时把主存中某个位置的值Load到自己的L1 Cache中，当Core1在自己的L1 Cache中修改这个位置的值时，会通过总线，使Core2中L1 Cache对应的值“失效”，而Core2一旦发现自己L1 Cache中的值失效（称为Cache命中缺失）则会通过总线从内存中加载该地址最新的值，大家通过总线的来回通信称为“Cache一致性流量”，因为总线被设计为固定的“通信能力”，如果Cache一致性流量过大，总线将成为瓶颈。而当Core1和Core2中的值再次一致时，称为“Cache一致性”，从这个层面来说，锁设计的终极目标便是减少Cache一致性流量。</p>
+<p>而CAS恰好会导致Cache一致性流量，如果有很多线程都共享同一个对象，当某个Core CAS成功时必然会引起总线风暴，这就是所谓的本地延迟，本质上偏向锁就是为了消除CAS，降低Cache一致性流量。</p>
+<p>Cache一致性：</p>
+<blockquote>
+<p>上面提到Cache一致性，其实是有协议支持的，现在通用的协议是MESI（最早由Intel开始支持），具体参考：<a target="_blank" rel="noopener" href="http://en.wikipedia.org/wiki/MESI_protocol。">http://en.wikipedia.org/wiki/MESI_protocol。</a></p>
+</blockquote>
+<p>Cache一致性流量的例外情况：</p>
+<blockquote>
+<p>其实也不是所有的CAS都会导致总线风暴，这跟Cache一致性协议有关，具体参考：<a target="_blank" rel="noopener" href="http://blogs.oracle.com/dave/entry/biased_locking_in_hotspot">http://blogs.oracle.com/dave/entry/biased_locking_in_hotspot</a></p>
+</blockquote>
+<p>NUMA(<em>Non Uniform Memory Access Achitecture</em>）架构：</p>
+<blockquote>
+<p>与SMP对应还有非对称多处理器架构，现在主要应用在一些高端处理器上，主要特点是没有总线，没有公用主存，每个Core有自己的内存，针对这种结构此处不做讨论。</p>
+</blockquote>
+<h4 id="5-4-1-偏向锁获取"><a href="#5-4-1-偏向锁获取" class="headerlink" title="5.4.1 偏向锁获取"></a>5.4.1 偏向锁获取</h4><p>所以，当一个线程访问同步块并获取锁时，会在对象头和栈帧中的锁记录里存储锁偏向的线程ID，以后该线程进入和退出同步块时不需要花费CAS操作来争夺锁资源，只需要检查是否为偏向锁、锁标识为以及ThreadID即可，处理流程如下：</p>
+<ol>
+<li><p>检测Mark Word是否为可偏向状态，即是否为偏向锁1，锁标识位为01；</p>
+</li>
+<li><p>若为可偏向状态，则测试线程ID是否为当前线程ID，如果是，则执行步骤(5)，否则执行步骤(3)</p>
+</li>
+<li><p>如果测试线程ID不为当前线程ID，则通过CAS操作竞争锁，竞争成功，则将Mark Word的线程ID替换为当前线程ID，否则执行线程(4)</p>
+</li>
+<li><p>通过CAS竞争锁失败，证明当前存在多线程竞争情况，当到达全局安全点，获得偏向锁的线程被挂起，偏向锁升级为轻量级锁，然后被阻塞在安全点的线程继续往下执行同步代码块</p>
+</li>
+<li><p>执行同步代码块；</p>
+</li>
+</ol>
+<h4 id="5-4-2-偏向锁的撤销"><a href="#5-4-2-偏向锁的撤销" class="headerlink" title="5.4.2 偏向锁的撤销"></a>5.4.2 偏向锁的撤销</h4><p>偏向锁采用了一种<strong>只有竞争才会释放锁</strong>的机制，线程是不会主动去释放偏向锁，需要等待其他线程来竞争。偏向锁的撤销需要 等待全局安全点（这个时间点是上没有正在执行的代码）。其步骤如下：</p>
+<ol>
+<li><p>暂停拥有偏向锁的线程；</p>
+</li>
+<li><p>判断锁对象是否还处于被锁定状态?否，则将对象头设置为无锁状态(01)，以允许其余线程竞争:是，则挂起持有锁的当前线程，并将指向当前线程的锁记录地址的指针放入对象头Mark Word，升级为轻量级锁状态(00)，然后恢复持有锁的当前线程，进入轻量级锁的竞争模式；</p>
+</li>
+</ol>
+<blockquote>
+<font color="gray" size="2">注意：此处将 当前线程挂起再恢复的过程中并没有发生锁的转移，仍然在当前线程手中，只是穿插了个 “将对象头中的线程ID变更为指向锁记录地址的指针” 这么个事。</font>
+
+</blockquote>
+<h3 id="5-5-轻量级锁"><a href="#5-5-轻量级锁" class="headerlink" title="5.5 轻量级锁"></a>5.5 轻量级锁</h3><h4 id="5-5-1-轻量级锁加锁"><a href="#5-5-1-轻量级锁加锁" class="headerlink" title="5.5.1 轻量级锁加锁"></a>5.5.1 轻量级锁加锁</h4><p>引入轻量级锁的主要目的是在没有多线程竞争的前提下，减少传统的重量级锁使用操作系统互斥量产生的性能消耗。当关闭偏向锁功能或者多个线程竞争偏向锁导致偏向锁升级为轻量级锁，则会尝试获取轻量级锁，其步骤如下：</p>
+<ol>
+<li>在线程进入同步块时，如果同步对象锁状态为无锁状态（锁标志位为“01”状态，是否为偏向锁为“0”），虚拟机首先将在当前线程的栈帧中建立一个名为锁记录（Lock Record）的空间，用于存储锁对象目前的Mark Word的拷贝，官方称之为 Displaced Mark Word。此时线程堆栈与对象头的状态如下图所示：</li>
+</ol>
+<div align="center">
+<image src="/java中的锁/轻量级锁cas_before.png" style="zoom:50%">
+
+轻量级锁CAS操作之前线程堆栈与对象的状态
+</image></div>
+
+<ol>
+<li><p>拷贝对象头中的Mark Word复制到锁记录（Lock Record）中；</p>
+</li>
+<li><p>拷贝成功后，虚拟机将使用CAS操作尝试将对象Mark Word中的Lock Word更新为指向当前线程Lock Record的指针，并将Lock record里的owner指针指向object mark word。如果更新成功，则执行步骤(4)，否则执行步骤(5)</p>
+</li>
+<li><p>如果这个更新动作成功了，那么当前线程就拥有了该对象的锁，并且对象Mark Word的锁标志位设置为“00”，即表示此对象处于轻量级锁定状态，此时线程堆栈与对象头的状态如下图所示：</p>
+</li>
+</ol>
+<div align="center">
+<image src="/java中的锁/轻量级锁cas_after.png" style="zoom:40%">
+
+轻量级锁CAS操作之后线程堆栈与对象的状态
+</image></div>
+
+<ol>
+<li>如果这个更新操作失败了，虚拟机首先会检查对象Mark Word中的Lock Word是否指向当前线程的栈帧，如果是，就说明当前线程已经拥有了这个对象的锁，那就可以直接进入同步块继续执行。否则说明多个线程竞争锁，进入自旋执行(3)，若自旋结束时仍未获得锁，轻量级锁就要膨胀为重量级锁，锁标志的状态值变为“10”，Mark Word中存储的就是指向重量级锁（互斥量）的指针，当前线程以及后面等待锁的线程也要进入阻塞状态。</li>
+</ol>
+<h4 id="5-5-2-轻量级锁的释放"><a href="#5-5-2-轻量级锁的释放" class="headerlink" title="5.5.2 轻量级锁的释放"></a>5.5.2 轻量级锁的释放</h4><p>轻量级锁的释放也是通过CAS操作来进行的，主要步骤如下：</p>
+<ol>
+<li><p>通过CAS操作尝试把线程中复制的Displaced Mark Word对象替换当前的Mark Word(还原为hashcode)</p>
+</li>
+<li><p>如果替换成功，整个同步过程就完成了，恢复到无锁状态(01)；</p>
+</li>
+<li><p>如果替换失败，说明有其他线程尝试过获取该锁（此时锁已膨胀），那就要在释放锁的同时，唤醒被挂起的线程；</p>
+</li>
+</ol>
+<p>对于轻量级锁，其性能提升的依据是 “对于绝大部分的锁，在整个生命周期内都是不会存在竞争的”，如果打破这个依据则除了互斥的开销外，还有额外的CAS操作，因此在有多线程竞争的情况下，轻量级锁比重量级锁更慢。</p>
+<ol>
+<li>为什么升级为轻量锁时要把对象头里的Mark Word复制到线程栈的锁记录中呢？</li>
+</ol>
+<blockquote>
+<p>因为在申请对象锁时 需要以该值作为CAS的比较条件，同时在升级到重量级锁的时候，能通过这个比较判定是否在持有锁的过程中此锁被其他线程申请过，如果被其他线程申请了，则在释放锁的时候要唤醒被挂起的线程。</p>
+</blockquote>
+<ol>
+<li>为什么会尝试CAS不成功以及什么情况下会不成功？</li>
+</ol>
+<blockquote>
+<p>CAS本身是不带锁机制的，其是通过比较而来。假设如下场景：线程A和线程B都在对象头里的锁标识为无锁状态进入，那么如线程A先更新对象头为其锁记录指针成功之后，线程B再用CAS去更新，就会发现此时的对象头已经不是其操作前的对象HashCode了，所以CAS会失败。也就是说，只有两个线程并发申请锁的时候会发生CAS失败。</p>
+<p>然后线程B进行CAS自旋，等待对象头的锁标识重新变回无锁状态或对象头内容等于对象HashCode（因为这是线程B做CAS操作前的值），这也就意味着线程A执行结束（参见后面轻量级锁的撤销，只有线程A执行完毕撤销锁了才会重置对象头），此时线程B的CAS操作终于成功了，于是线程B获得了锁以及执行同步代码的权限。如果线程A的执行时间较长，线程B经过若干次CAS时钟没有成功，则锁膨胀为重量级锁，即线程B被挂起阻塞、等待重新调度。</p>
+</blockquote>
+<p>此处，如何理解“轻量级”？“轻量级”是相对于使用操作系统互斥量来实现的传统锁而言的。但是，首先需要强调一点的是，轻量级锁并不是用来代替重量级锁的，它的本意是在没有多线程竞争的前提下，减少传统的重量级锁使用产生的性能消耗。</p>
+<blockquote>
+<p>轻量级锁所适应的场景是线程交替执行同步块的情况，如果存在同一时间访问同一锁的情况，必然就会导致轻量级锁膨胀为重量级锁。</p>
+</blockquote>
+<h3 id="5-6-重量级锁"><a href="#5-6-重量级锁" class="headerlink" title="5.6 重量级锁"></a>5.6 重量级锁</h3><p><font color="#dd4466">Synchronized是通过对象内部的监视器锁(Monitor)来实现的。但是监视器锁本质又是依赖于底层的操作系统的Mutex Lock来实现的。而操作系统实现线程之间的切换这就需要从用户态转换到核心态，这个成本非常高，状态之间的转换需要相对比较长的时间，这就是为什么Synchronized效率低的原因。因此，这种依赖于操作系统Mutex Lock所实现的锁我们称之为 “重量级锁”</font>。</p>
+<h2 id="6-锁的升级"><a href="#6-锁的升级" class="headerlink" title="6 锁的升级"></a>6 锁的升级</h2><p>我们通常说的通过synchronized实现的同步锁，真实名称叫做==重量级锁==。但是重量级锁会造成==线程排队==（串行执行），且会使==CPU在用户态和核心态之间频繁切换==，所以代价高、效率低。为了提高效率，不会一开始就使用重量级锁，JVM在内部会根据需要，按如下步骤进行==锁的升级==：</p>
+<ol>
+<li><p>初期锁对象刚创建时，还没有任何线程来竞争，对象的Mark Word的偏向锁标识位是0，锁状态01，说明该对象处于==无锁状态==（无线程竞争它）。</p>
+</li>
+<li><p>当有一个线程来竞争锁时，先用==偏向锁==，表示锁对象偏爱这个线程，这个线程要执行这个锁关联的任何代码，不需要再做任何检查和切换，这种竞争不激烈的情况下，效率非常高。这时Mark Word会记录自己偏爱的线程的ID，把该线程当做自己的熟人</p>
+</li>
+<li><p>当有两个线程开始竞争这个锁对象，情况发生变化了，不再是偏向（独占）锁了，锁会升级为==轻量级锁==，两个线程公平竞争，哪个线程先占有锁对象并执行代码，锁对象的Mark Word就执行哪个线程的栈帧中的锁记录</p>
+</li>
+<li><p>如果竞争的这个锁对象的线程更多，导致了更多的切换和等待，JVM会把该锁对象的锁升级为==重量级锁==，这个就叫做==同步锁==，这个锁对象Mark Word再次发生变化，会指向一个监视器对象，这个监视器对象用集合的形式，来登记和管理排队的线程</p>
+</li>
+</ol>
+<h2 id="7-锁的优劣"><a href="#7-锁的优劣" class="headerlink" title="7 锁的优劣"></a>7 锁的优劣</h2><blockquote>
+<p>参考资料<br>《深入理解Java虚拟机》<br>《Java并发编程的艺术》<br><a target="_blank" rel="noopener" href="https://www.cnblogs.com/aspirant/p/11470858.html">深入分析Synchronized原理</a><br><a target="_blank" rel="noopener" href="https://blog.csdn.net/javazejian/article/details/72828483">深入理解Java并发之synchronized实现原理</a></p>
+</blockquote>
+
+    </div>
+
+    
+    
+    <div style="text-align:center;color: #ccc;font-size:24px;">-------------本文结束<i class="fa fa-paw"></i>感谢您的阅读-------------</div>
+        
+
+<div>
+<ul class="post-copyright">
+  <li class="post-copyright-author">
+    <strong>本文作者： </strong>hcy6713
+  </li>
+  <li class="post-copyright-link">
+    <strong>本文链接：</strong>
+    <a href="http://hcy6713.cn/posts/895d3750/" title="synchronized的实现原理">http://hcy6713.cn/posts/895d3750/</a>
+  </li>
+  <li class="post-copyright-license">
+    <strong>版权声明： </strong>本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/zh-CN" rel="noopener" target="_blank"><i class="fab fa-fw fa-creative-commons"></i>BY-NC-SA</a> 许可协议。转载请注明出处！
+  </li>
+</ul>
+</div>
+
+
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag"># 并发</a>
+              <a href="/tags/synchronized/" rel="tag"># synchronized</a>
+              <a href="/tags/%E9%94%81/" rel="tag"># 锁</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/posts/8628805/" rel="prev" title="前缀和">
+      <i class="fa fa-chevron-left"></i> 前缀和
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/posts/fb6268d0/" rel="next" title="violate和synchronized">
+      violate和synchronized <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#1-%E5%9F%BA%E6%9C%AC%E4%BD%BF%E7%94%A8"><span class="nav-text">1 基本使用</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#2-Java%E5%AF%B9%E8%B1%A1%E5%A4%B4"><span class="nav-text">2 Java对象头</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#3-monitor"><span class="nav-text">3 monitor</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#3-1-%E4%BB%A3%E7%A0%81%E5%9D%97%E5%90%8C%E6%AD%A5"><span class="nav-text">3.1 代码块同步</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#3-2-%E6%96%B9%E6%B3%95%E5%90%8C%E6%AD%A5"><span class="nav-text">3.2 方法同步</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#4-ObjectMonitor"><span class="nav-text">4 ObjectMonitor</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#4-1-monitor%E7%AB%9E%E4%BA%89%E8%BF%87%E7%A8%8B"><span class="nav-text">4.1 monitor竞争过程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#4-2-monitor%E7%AD%89%E5%BE%85"><span class="nav-text">4.2 monitor等待</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#5-%E9%94%81%E7%9A%84%E4%BC%98%E5%8C%96"><span class="nav-text">5 锁的优化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#5-1-%E8%87%AA%E6%97%8B%E9%94%81"><span class="nav-text">5.1 自旋锁</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#5-1-1-%E9%80%82%E5%BA%94%E6%80%A7%E8%87%AA%E6%97%8B%E9%94%81"><span class="nav-text">5.1.1 适应性自旋锁</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-2-%E9%94%81%E6%B6%88%E9%99%A4"><span class="nav-text">5.2 锁消除</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-3-%E9%94%81%E7%B2%97%E5%8C%96"><span class="nav-text">5.3 锁粗化</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-4-%E5%81%8F%E5%90%91%E9%94%81"><span class="nav-text">5.4 偏向锁</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#5-4-1-%E5%81%8F%E5%90%91%E9%94%81%E8%8E%B7%E5%8F%96"><span class="nav-text">5.4.1 偏向锁获取</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#5-4-2-%E5%81%8F%E5%90%91%E9%94%81%E7%9A%84%E6%92%A4%E9%94%80"><span class="nav-text">5.4.2 偏向锁的撤销</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-5-%E8%BD%BB%E9%87%8F%E7%BA%A7%E9%94%81"><span class="nav-text">5.5 轻量级锁</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#5-5-1-%E8%BD%BB%E9%87%8F%E7%BA%A7%E9%94%81%E5%8A%A0%E9%94%81"><span class="nav-text">5.5.1 轻量级锁加锁</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#5-5-2-%E8%BD%BB%E9%87%8F%E7%BA%A7%E9%94%81%E7%9A%84%E9%87%8A%E6%94%BE"><span class="nav-text">5.5.2 轻量级锁的释放</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#5-6-%E9%87%8D%E9%87%8F%E7%BA%A7%E9%94%81"><span class="nav-text">5.6 重量级锁</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#6-%E9%94%81%E7%9A%84%E5%8D%87%E7%BA%A7"><span class="nav-text">6 锁的升级</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#7-%E9%94%81%E7%9A%84%E4%BC%98%E5%8A%A3"><span class="nav-text">7 锁的优劣</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="hcy6713"
+      src="/images/me.png">
+  <p class="site-author-name" itemprop="name">hcy6713</p>
+  <div class="site-description" itemprop="description">选择有时候比努力更重要</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">6</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">12</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 2021-11 – 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">hcy6713</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+<div class="theme-info">
+  <div class="powered-by"></div>
+  <span class="post-count">博客全站共24.6k字</span>
+</div>
+
+        
+<div class="busuanzi-count">
+  <script data-pjax async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  
+  <script color='0,0,255' opacity='0.5' zIndex='-1' count='99' src="/lib/canvas-nest/canvas-nest.min.js"></script>
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/medium-zoom@1/dist/medium-zoom.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+  
+
+    </div>
+</body>
+</html>
