@@ -32,7 +32,7 @@
 <meta property="og:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word%E7%9A%84%E7%8A%B6%E6%80%81%E5%8F%98%E5%8C%96.png">
 <meta property="og:image" content="http://hcy6713.cn/posts/895d3750/Mark%20Word(64bit">
 <meta property="article:published_time" content="2022-07-20T12:01:11.000Z">
-<meta property="article:modified_time" content="2022-07-20T17:11:09.834Z">
+<meta property="article:modified_time" content="2022-07-20T17:19:02.192Z">
 <meta property="article:author" content="hcy6713">
 <meta property="article:tag" content="并发">
 <meta property="article:tag" content="synchronized">
@@ -208,7 +208,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2022-07-21 01:11:09" itemprop="dateModified" datetime="2022-07-21T01:11:09+08:00">2022-07-21</time>
+                <time title="修改时间：2022-07-21 01:19:02" itemprop="dateModified" datetime="2022-07-21T01:19:02+08:00">2022-07-21</time>
               </span>
             <span class="post-meta-item">
               <span class="post-meta-item-icon">
@@ -515,15 +515,15 @@
 <p>轻量级锁所适应的场景是线程交替执行同步块的情况，如果存在同一时间访问同一锁的情况，必然就会导致轻量级锁膨胀为重量级锁。</p>
 </blockquote>
 <h3 id="5-6-重量级锁"><a href="#5-6-重量级锁" class="headerlink" title="5.6 重量级锁"></a>5.6 重量级锁</h3><p><font color="#dd4466">Synchronized是通过对象内部的监视器锁(Monitor)来实现的。但是监视器锁本质又是依赖于底层的操作系统的Mutex Lock来实现的。而操作系统实现线程之间的切换这就需要从用户态转换到核心态，这个成本非常高，状态之间的转换需要相对比较长的时间，这就是为什么Synchronized效率低的原因。因此，这种依赖于操作系统Mutex Lock所实现的锁我们称之为 “重量级锁”</font>。</p>
-<h2 id="6-锁的升级"><a href="#6-锁的升级" class="headerlink" title="6 锁的升级"></a>6 锁的升级</h2><p>我们通常说的通过synchronized实现的同步锁，真实名称叫做==重量级锁==。但是重量级锁会造成==线程排队==（串行执行），且会使==CPU在用户态和核心态之间频繁切换==，所以代价高、效率低。为了提高效率，不会一开始就使用重量级锁，JVM在内部会根据需要，按如下步骤进行==锁的升级==：</p>
+<h2 id="6-锁的升级"><a href="#6-锁的升级" class="headerlink" title="6 锁的升级"></a>6 锁的升级</h2><p>我们通常说的通过synchronized实现的同步锁，真实名称叫做<strong>重量级锁</strong>。但是重量级锁会造成<strong>线程排队</strong>（串行执行），且会使<strong>CPU在用户态和核心态之间频繁切换</strong>，所以代价高、效率低。为了提高效率，不会一开始就使用重量级锁，JVM在内部会根据需要，按如下步骤进行<strong>锁的升级</strong>：</p>
 <ol>
-<li><p>初期锁对象刚创建时，还没有任何线程来竞争，对象的Mark Word的偏向锁标识位是0，锁状态01，说明该对象处于==无锁状态==（无线程竞争它）。</p>
+<li><p>初期锁对象刚创建时，还没有任何线程来竞争，对象的Mark Word的偏向锁标识位是0，锁状态01，说明该对象处于<strong>无锁状态</strong>（无线程竞争它）。</p>
 </li>
-<li><p>当有一个线程来竞争锁时，先用==偏向锁==，表示锁对象偏爱这个线程，这个线程要执行这个锁关联的任何代码，不需要再做任何检查和切换，这种竞争不激烈的情况下，效率非常高。这时Mark Word会记录自己偏爱的线程的ID，把该线程当做自己的熟人</p>
+<li><p>当有一个线程来竞争锁时，先用<strong>偏向锁</strong>，表示锁对象偏爱这个线程，这个线程要执行这个锁关联的任何代码，不需要再做任何检查和切换，这种竞争不激烈的情况下，效率非常高。这时Mark Word会记录自己偏爱的线程的ID，把该线程当做自己的熟人</p>
 </li>
-<li><p>当有两个线程开始竞争这个锁对象，情况发生变化了，不再是偏向（独占）锁了，锁会升级为==轻量级锁==，两个线程公平竞争，哪个线程先占有锁对象并执行代码，锁对象的Mark Word就执行哪个线程的栈帧中的锁记录</p>
+<li><p>当有两个线程开始竞争这个锁对象，情况发生变化了，不再是偏向（独占）锁了，锁会升级为<strong>轻量级锁</strong>，两个线程公平竞争，哪个线程先占有锁对象并执行代码，锁对象的Mark Word就执行哪个线程的栈帧中的锁记录</p>
 </li>
-<li><p>如果竞争的这个锁对象的线程更多，导致了更多的切换和等待，JVM会把该锁对象的锁升级为==重量级锁==，这个就叫做==同步锁==，这个锁对象Mark Word再次发生变化，会指向一个监视器对象，这个监视器对象用集合的形式，来登记和管理排队的线程</p>
+<li><p>如果竞争的这个锁对象的线程更多，导致了更多的切换和等待，JVM会把该锁对象的锁升级为<strong>重量级锁</strong>，这个就叫做<strong>同步锁</strong>，这个锁对象Mark Word再次发生变化，会指向一个监视器对象，这个监视器对象用集合的形式，来登记和管理排队的线程</p>
 </li>
 </ol>
 <h2 id="7-锁的优劣"><a href="#7-锁的优劣" class="headerlink" title="7 锁的优劣"></a>7 锁的优劣</h2><div class="table-container">
